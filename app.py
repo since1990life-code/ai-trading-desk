@@ -1,6 +1,6 @@
 from flask import Flask, request, render_template, redirect, url_for, jsonify
 from datetime import datetime, timezone
-import csv, io, json, os, urllib.request, urllib.error
+import csv, io, json, os, urllib.request, urllib.error, urllib.parse
 
 app = Flask(__name__)
 
@@ -432,6 +432,24 @@ def fetch_btc_price():
             return round(float(data["price"]), 2)
     except Exception:
         return None
+
+
+def fetch_gold_price():
+    """Returns (price_float, status_str). status is 'OK', 'NO_API_KEY', or an error msg."""
+    api_key = os.environ.get("TWELVE_DATA_API_KEY", "").strip()
+    if not api_key:
+        return None, "NO_API_KEY"
+    try:
+        params = urllib.parse.urlencode({"symbol": "XAU/USD", "apikey": api_key})
+        url = "https://api.twelvedata.com/price?" + params
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            data = json.loads(resp.read().decode())
+        if "price" in data:
+            return round(float(data["price"]), 2), "OK"
+        msg = str(data.get("message", "API error"))
+        return None, msg[:60]
+    except Exception:
+        return None, "ERROR"
 
 
 # ── PRESET HELPERS ────────────────────────────────────────────────────────────
@@ -872,8 +890,29 @@ def strategy_load_file():
         return redirect(url_for("index", tab="strategy", error=str(e)))
 
 
+@app.route("/api/prices")
+def api_prices():
+    now        = datetime.now().strftime("%H:%M:%S")
+    btc_price  = fetch_btc_price()
+    gold_price, gold_status = fetch_gold_price()
+    return jsonify({
+        "btc": {
+            "price":      btc_price,
+            "status":     "OK" if btc_price is not None else "ERROR",
+            "fetched_at": now,
+        },
+        "gold": {
+            "price":      gold_price,
+            "status":     gold_status,
+            "fetched_at": now,
+        },
+        "fetched_at": now,
+    })
+
+
 @app.route("/api/price")
 def api_price():
+    """Legacy single-asset endpoint kept for backward compatibility."""
     price = fetch_btc_price()
     now   = datetime.now().strftime("%H:%M:%S")
     if price is None:

@@ -1066,6 +1066,27 @@
 {% if success and active_tab == 'gold' %}
   <div class="alert-success">{{ success }}</div>
 {% endif %}
+
+<!-- Live GOLD Price card (always visible) -->
+<div class="card">
+  <div class="card-title">現在価格 — Twelve Data XAU/USD</div>
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+    <div style="min-width:0;">
+      <div id="gold-live-price" style="font-size:2em; font-weight:bold; color:var(--yellow); letter-spacing:0.02em; line-height:1.1;">—</div>
+      <div style="font-size:0.64em; color:var(--dim); margin-top:3px;">
+        更新時刻: <span id="gold-live-time">—</span>
+      </div>
+    </div>
+    <button class="btn btn-secondary" onclick="fetchPrices()"
+            style="width:auto; padding:8px 16px; font-size:0.78em; flex-shrink:0;">
+      &#8635; 更新
+    </button>
+  </div>
+  <div id="gold-live-status" style="margin-top:10px; font-size:0.6em; color:var(--dim); border-top:1px solid var(--border); padding-top:7px;">
+    XAU/USD · 30秒ごとに自動更新 · 要: TWELVE_DATA_API_KEY
+  </div>
+</div>
+
 {% if gold %}
 
   <!-- Stat card -->
@@ -1394,20 +1415,20 @@
 <!-- Live BTC Price card (always visible) -->
 <div class="card">
   <div class="card-title">現在価格 — Binance BTCUSDT</div>
-  <div style="display:flex; align-items:center; justify-content:space-between;">
-    <div>
-      <div id="btc-live-price" style="font-size:2em; font-weight:bold; color:var(--yellow); letter-spacing:0.02em;">—</div>
+  <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+    <div style="min-width:0;">
+      <div id="btc-live-price" style="font-size:2em; font-weight:bold; color:var(--yellow); letter-spacing:0.02em; line-height:1.1;">—</div>
       <div style="font-size:0.64em; color:var(--dim); margin-top:3px;">
         更新時刻: <span id="btc-live-time">—</span>
       </div>
     </div>
-    <button class="btn btn-secondary" onclick="fetchBtcPrice()"
-            style="width:auto; padding:8px 16px; font-size:0.78em;">
-      ↻ 更新
+    <button class="btn btn-secondary" onclick="fetchPrices()"
+            style="width:auto; padding:8px 16px; font-size:0.78em; flex-shrink:0;">
+      &#8635; 更新
     </button>
   </div>
   <div style="margin-top:10px; font-size:0.6em; color:var(--dim); border-top:1px solid var(--border); padding-top:7px;">
-    BTCUSDT · 30秒ごとに自動更新
+    BTCUSDT · 30秒ごとに自動更新 · Binance
   </div>
 </div>
 
@@ -1873,6 +1894,9 @@
         <div class="mkt-empty-dash">—</div>
         <div class="mkt-empty-label">no data</div>
       {% endif %}
+      <div id="gold-live-price-monitor"
+           style="font-size:0.65em; color:var(--yellow); margin-top:6px; padding-top:5px;
+                  border-top:1px solid rgba(255,255,255,.05); letter-spacing:0.02em;">—</div>
     </div>
     <div class="mkt-cell {% if btc_status == 'READY' %}mkt-cell-ready{% elif btc_status == 'WATCH' %}mkt-cell-watch{% elif btc_status == 'WAIT' or btc_status == 'SKIP' %}mkt-cell-wait{% else %}mkt-cell-empty{% endif %}">
       <div class="mkt-name">BTC / BTCUSD</div>
@@ -2460,35 +2484,71 @@
     switchTab(btn);
   })();
 
-  // ── Live BTC Price ────────────────────────────────────────────────────────
-  function fetchBtcPrice() {
-    fetch('/api/price')
+  // ── Live Prices (BTC + GOLD) ─────────────────────────────────────────────
+  function fetchPrices() {
+    fetch('/api/prices')
       .then(function(r) { return r.json(); })
       .then(function(d) {
-        var priceEl   = document.getElementById('btc-live-price');
-        var timeEl    = document.getElementById('btc-live-time');
-        var monitorEl = document.getElementById('btc-live-price-monitor');
-        if (d.price) {
-          var fmt = '$' + d.price.toLocaleString('en-US', {
+        var now = d.fetched_at || '';
+
+        // ── BTC ──
+        var btc       = d.btc || {};
+        var btcPriceEl   = document.getElementById('btc-live-price');
+        var btcTimeEl    = document.getElementById('btc-live-time');
+        var btcMonitorEl = document.getElementById('btc-live-price-monitor');
+
+        if (btc.price) {
+          var btcFmt = '$' + btc.price.toLocaleString('en-US', {
             minimumFractionDigits: 2, maximumFractionDigits: 2
           });
-          if (priceEl)   priceEl.textContent   = fmt;
-          if (monitorEl) monitorEl.textContent  = fmt;
-          if (timeEl)    timeEl.textContent     = d.fetched_at;
+          if (btcPriceEl)   btcPriceEl.textContent   = btcFmt;
+          if (btcMonitorEl) btcMonitorEl.textContent  = btcFmt;
+          if (btcTimeEl)    btcTimeEl.textContent     = now;
         } else {
-          if (priceEl)   priceEl.textContent   = 'API Error';
-          if (monitorEl) monitorEl.textContent  = '—';
-          if (timeEl)    timeEl.textContent     = d.fetched_at || '—';
+          if (btcPriceEl)   btcPriceEl.textContent   = 'API ERROR';
+          if (btcMonitorEl) btcMonitorEl.textContent  = '—';
+          if (btcTimeEl)    btcTimeEl.textContent     = now;
+        }
+
+        // ── GOLD ──
+        var gold          = d.gold || {};
+        var goldPriceEl   = document.getElementById('gold-live-price');
+        var goldTimeEl    = document.getElementById('gold-live-time');
+        var goldStatusEl  = document.getElementById('gold-live-status');
+        var goldMonitorEl = document.getElementById('gold-live-price-monitor');
+
+        if (gold.price) {
+          var goldFmt = '$' + gold.price.toLocaleString('en-US', {
+            minimumFractionDigits: 2, maximumFractionDigits: 2
+          });
+          if (goldPriceEl)   goldPriceEl.textContent   = goldFmt;
+          if (goldMonitorEl) goldMonitorEl.textContent  = goldFmt;
+          if (goldTimeEl)    goldTimeEl.textContent     = now;
+          if (goldStatusEl)  goldStatusEl.textContent   = 'XAU/USD · 30秒ごとに自動更新 · Twelve Data';
+        } else {
+          var gStatus = gold.status || 'ERROR';
+          if (goldPriceEl)   goldPriceEl.textContent   = gStatus === 'NO_API_KEY' ? 'KEY 未設定' : 'API ERROR';
+          if (goldMonitorEl) goldMonitorEl.textContent  = '—';
+          if (goldTimeEl)    goldTimeEl.textContent     = now;
+          if (goldStatusEl) {
+            if (gStatus === 'NO_API_KEY') {
+              goldStatusEl.textContent = 'TWELVE_DATA_API_KEY 環境変数未設定';
+            } else {
+              goldStatusEl.textContent = 'エラー: ' + gStatus;
+            }
+          }
         }
       })
       .catch(function() {
-        var priceEl = document.getElementById('btc-live-price');
-        if (priceEl) priceEl.textContent = 'Network Error';
+        var btcEl  = document.getElementById('btc-live-price');
+        var goldEl = document.getElementById('gold-live-price');
+        if (btcEl)  btcEl.textContent  = 'Network Error';
+        if (goldEl) goldEl.textContent = 'Network Error';
       });
   }
 
-  fetchBtcPrice();
-  setInterval(fetchBtcPrice, 30000);
+  fetchPrices();
+  setInterval(fetchPrices, 30000);
 
   // Mobile keyboard hints — decimal for price inputs, numeric for integers
   document.querySelectorAll('input[type=number]').forEach(function(el) {
