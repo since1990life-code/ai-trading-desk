@@ -425,13 +425,14 @@ def parse_csv(file_bytes, period):
 # ── LIVE PRICE ────────────────────────────────────────────────────────────────
 
 def fetch_btc_price():
+    """Returns (price_float, status_str). status is 'OK' or 'ERROR'."""
     try:
-        url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
+        url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
         with urllib.request.urlopen(url, timeout=5) as resp:
             data = json.loads(resp.read().decode())
-            return round(float(data["price"]), 2)
+            return round(float(data["bitcoin"]["usd"]), 2), "OK"
     except Exception:
-        return None
+        return None, "ERROR"
 
 
 def fetch_gold_price():
@@ -892,13 +893,13 @@ def strategy_load_file():
 
 @app.route("/api/prices")
 def api_prices():
-    now        = datetime.now().strftime("%H:%M:%S")
-    btc_price  = fetch_btc_price()
+    now                     = datetime.now().strftime("%H:%M:%S")
+    btc_price,  btc_status  = fetch_btc_price()
     gold_price, gold_status = fetch_gold_price()
     return jsonify({
         "btc": {
             "price":      btc_price,
-            "status":     "OK" if btc_price is not None else "ERROR",
+            "status":     btc_status,
             "fetched_at": now,
         },
         "gold": {
@@ -913,8 +914,8 @@ def api_prices():
 @app.route("/api/price")
 def api_price():
     """Legacy single-asset endpoint kept for backward compatibility."""
-    price = fetch_btc_price()
-    now   = datetime.now().strftime("%H:%M:%S")
+    price, _ = fetch_btc_price()
+    now      = datetime.now().strftime("%H:%M:%S")
     if price is None:
         return jsonify({"price": None, "error": "API unavailable", "fetched_at": now}), 503
     return jsonify({"price": price, "fetched_at": now})
