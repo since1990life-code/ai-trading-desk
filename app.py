@@ -425,14 +425,42 @@ def parse_csv(file_bytes, period):
 # ── LIVE PRICE ────────────────────────────────────────────────────────────────
 
 def fetch_btc_price():
-    """Returns (price_float, status_str). status is 'OK' or 'ERROR'."""
+    """Returns (price_float, status_str).
+    Tries CoinGecko first, falls back to Coinbase.
+    Status is 'OK', 'CG:<error>', or 'CB:<error>' for diagnosis.
+    """
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; TradingDesk/1.0)"}
+
+    # ── 1. CoinGecko ─────────────────────────────────────────────────────────
+    cg_url = ("https://api.coingecko.com/api/v3/simple/price"
+              "?ids=bitcoin&vs_currencies=usd")
     try:
-        url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
-        with urllib.request.urlopen(url, timeout=5) as resp:
+        req  = urllib.request.Request(cg_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=8) as resp:
             data = json.loads(resp.read().decode())
-            return round(float(data["bitcoin"]["usd"]), 2), "OK"
-    except Exception:
-        return None, "ERROR"
+        return round(float(data["bitcoin"]["usd"]), 2), "OK"
+    except urllib.error.HTTPError as e:
+        cg_err = f"CG:HTTP{e.code}"
+    except urllib.error.URLError as e:
+        cg_err = f"CG:{str(e.reason)[:30]}"
+    except Exception as e:
+        cg_err = f"CG:{type(e).__name__}"
+
+    # ── 2. Coinbase fallback ──────────────────────────────────────────────────
+    cb_url = "https://api.coinbase.com/v2/prices/BTC-USD/spot"
+    try:
+        req  = urllib.request.Request(cb_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode())
+        return round(float(data["data"]["amount"]), 2), "OK"
+    except urllib.error.HTTPError as e:
+        cb_err = f"CB:HTTP{e.code}"
+    except urllib.error.URLError as e:
+        cb_err = f"CB:{str(e.reason)[:30]}"
+    except Exception as e:
+        cb_err = f"CB:{type(e).__name__}"
+
+    return None, f"{cg_err} {cb_err}"
 
 
 def fetch_gold_price():
