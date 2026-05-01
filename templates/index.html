@@ -1,0 +1,2501 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0d1117">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Trading Desk">
+  <title>AI Trading Desk</title>
+  <style>
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Tokens ── */
+    :root {
+      --bg:       #0d1117;
+      --surface:  #161b22;
+      --surface2: #1c2128;
+      --border:   #30363d;
+      --text:     #c9d1d9;
+      --muted:    #8b949e;
+      --dim:      #484f58;
+      --green:    #3fb950;
+      --red:      #f85149;
+      --yellow:   #d29922;
+      --blue:     #58a6ff;
+      --accent:   #1f6feb;
+      --orange:   #e07b30;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Courier New', monospace;
+      font-size: 15px;
+      min-height: 100vh;
+      /* iPhone notch / Dynamic Island safe area */
+      padding-left:  env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
+
+    /* ════════════════════════════════════════════
+       HEADER
+    ════════════════════════════════════════════ */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-title { color: var(--blue); font-size: 1em; font-weight: bold; }
+    .header-sub   { color: var(--muted); font-size: 0.68em; margin-top: 2px; }
+
+    .h-decision {
+      font-size: 0.75em;
+      font-weight: bold;
+      letter-spacing: 0.05em;
+      padding: 4px 11px;
+      border-radius: 4px;
+    }
+    .h-decision-ready  { color: var(--green);  background: rgba(63,185,80,.12);  border: 1px solid rgba(63,185,80,.35); }
+    .h-decision-watch  { color: var(--yellow); background: rgba(210,153,34,.12); border: 1px solid rgba(210,153,34,.35); }
+    .h-decision-wait   { color: var(--red);    background: rgba(248,81,73,.12);  border: 1px solid rgba(248,81,73,.35); }
+    .h-decision-nodata { color: var(--dim); font-size: 1em; font-weight: normal; letter-spacing: 0; border: none; background: none; padding: 0; }
+
+    /* ════════════════════════════════════════════
+       TABS
+    ════════════════════════════════════════════ */
+    .tabs {
+      display: flex;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .tab-btn {
+      flex: 1;
+      min-width: 80px;
+      padding: 11px 4px;
+      text-align: center;
+      font-family: 'Courier New', monospace;
+      font-size: 0.66em;
+      font-weight: bold;
+      letter-spacing: 0.03em;
+      color: var(--muted);
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color .15s;
+    }
+    .tab-btn:hover  { color: var(--text); }
+    .tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+    /* ════════════════════════════════════════════
+       PANELS
+    ════════════════════════════════════════════ */
+    .tab-panel { display: none; padding: 18px 16px 28px; max-width: 680px; margin: 0 auto; }
+    .tab-panel.active { display: block; }
+
+    /* ════════════════════════════════════════════
+       CARD
+    ════════════════════════════════════════════ */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px;
+      margin-bottom: 14px;
+    }
+    .card-title {
+      font-size: 0.64em;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 14px;
+    }
+
+    /* ════════════════════════════════════════════
+       HERO DECISION CARD
+    ════════════════════════════════════════════ */
+    .hero-card {
+      text-align: center;
+      padding: 30px 20px 24px;
+      border-radius: 10px;
+      margin-bottom: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+    .hero-card-ready { border-color: rgba(63,185,80,.45); }
+    .hero-card-watch { border-color: rgba(210,153,34,.45); }
+    .hero-card-wait  { border-color: rgba(248,81,73,.45); }
+
+    .hero-eyebrow {
+      font-size: 0.6em;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      margin-bottom: 14px;
+    }
+    .hero-value {
+      font-size: 3.4em;
+      font-weight: bold;
+      letter-spacing: 0.1em;
+      line-height: 1;
+      margin-bottom: 14px;
+    }
+    .hero-value-empty {
+      font-size: 1.6em;
+      color: var(--dim);
+      letter-spacing: 0.04em;
+      margin-bottom: 10px;
+      font-weight: normal;
+    }
+    .hero-sub {
+      font-size: 0.76em;
+      color: var(--muted);
+      line-height: 1.6;
+      max-width: 300px;
+      margin: 0 auto;
+    }
+    .hero-sub-empty { font-size: 0.7em; color: var(--dim); }
+
+    /* ── Action guidance tags ── */
+    .hero-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 7px;
+      margin-top: 18px;
+    }
+    .action-tag {
+      display: inline-block;
+      padding: 5px 20px;
+      border-radius: 20px;
+      font-size: 0.7em;
+      font-weight: bold;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .action-tag-watch    { background: rgba(63,185,80,.12);   color: var(--green);  border: 1px solid rgba(63,185,80,.4); }
+    .action-tag-confirm  { background: rgba(210,153,34,.12);  color: var(--yellow); border: 1px solid rgba(210,153,34,.4); }
+    .action-tag-prohibit { background: rgba(248,81,73,.12);   color: var(--red);    border: 1px solid rgba(248,81,73,.4); }
+    .action-tag-setup    { background: rgba(139,148,158,.08); color: var(--muted);  border: 1px solid var(--border); }
+
+    /* ════════════════════════════════════════════
+       MARKET COMPARISON ROW (MONITOR)
+    ════════════════════════════════════════════ */
+    .mkt-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .mkt-cell {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 12px 14px;
+      text-align: center;
+    }
+    .mkt-cell-ready { border-color: rgba(63,185,80,.38);  background: rgba(63,185,80,.03); }
+    .mkt-cell-watch { border-color: rgba(210,153,34,.38); background: rgba(210,153,34,.03); }
+    .mkt-cell-wait  { border-color: rgba(248,81,73,.38);  background: rgba(248,81,73,.03); }
+    .mkt-cell-empty { border-color: var(--border); }
+
+    .mkt-name {
+      font-size: 0.6em;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 10px;
+    }
+    .mkt-status {
+      font-size: 1.8em;
+      font-weight: bold;
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+      line-height: 1;
+    }
+    .mkt-score {
+      font-size: 0.76em;
+      color: var(--muted);
+      margin-bottom: 4px;
+      letter-spacing: 0.02em;
+    }
+    .mkt-trend { font-size: 0.64em; color: var(--muted); }
+    .mkt-empty-dash  { font-size: 1.4em; color: var(--dim); margin-bottom: 4px; font-weight: normal; }
+    .mkt-empty-label { font-size: 0.6em; color: var(--dim); letter-spacing: 0.06em; text-transform: uppercase; }
+
+    /* Component breakdown strip inside market comparison cells */
+    .mkt-bd {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 7px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(255,255,255,.06);
+      font-size: 0.6em;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+    .mkt-bd-item { white-space: nowrap; }
+
+    /* ════════════════════════════════════════════
+       UPLOAD ACCORDION
+    ════════════════════════════════════════════ */
+    .upload-accordion {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .upload-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .upload-header:hover { background: rgba(255,255,255,.02); }
+    .upload-header-label {
+      font-size: 0.72em;
+      color: var(--text);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .upload-arrow {
+      font-size: 0.75em;
+      color: var(--dim);
+      transition: transform .2s;
+      line-height: 1;
+    }
+    .upload-arrow.open { transform: rotate(180deg); }
+    .upload-body { padding: 0 14px 14px; display: none; }
+
+    /* ════════════════════════════════════════════
+       SESSION BAR  (between header and tabs)
+    ════════════════════════════════════════════ */
+    .session-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 20px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.67em;
+    }
+    .sbar-time { color: var(--muted); letter-spacing: 0.04em; }
+    .sbar-session {
+      font-weight: bold;
+      padding: 2px 9px;
+      border-radius: 3px;
+      letter-spacing: 0.05em;
+    }
+    .sess-london   { color: var(--blue);   background: rgba(88,166,255,.12);  border: 1px solid rgba(88,166,255,.3); }
+    .sess-newyork  { color: var(--green);  background: rgba(63,185,80,.12);   border: 1px solid rgba(63,185,80,.3); }
+    .sess-asia     { color: var(--yellow); background: rgba(210,153,34,.12);  border: 1px solid rgba(210,153,34,.3); }
+    .sess-off      { color: var(--dim);    background: transparent;           border: 1px solid var(--border); }
+
+    /* ════════════════════════════════════════════
+       STAT CARD (GOLD / BTC tabs)
+    ════════════════════════════════════════════ */
+    .desk-status-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .desk-status-label {
+      font-size: 0.62em;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .stat-label {
+      font-size: 0.62em;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 4px;
+    }
+    .stat-value { font-size: 1em; font-weight: bold; }
+
+    /* Condition + Last Update rows */
+    .cond-block {
+      padding-top: 12px;
+      margin-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .cond-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 3px;
+    }
+    .cond-label  { font-size: 0.62em; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .cond-value  { font-size: 0.85em; font-weight: bold; }
+    .cond-detail { font-size: 0.66em; color: var(--muted); text-align: right; }
+    .update-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 10px;
+      margin-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+    .update-label { font-size: 0.6em;  color: var(--dim);   text-transform: uppercase; letter-spacing: 0.06em; }
+    .update-value { font-size: 0.68em; color: var(--muted); }
+
+    /* ════════════════════════════════════════════
+       SCORE CARD (GOLD / BTC tabs)
+    ════════════════════════════════════════════ */
+    .score-top {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .score-big {
+      font-size: 2.6em;
+      font-weight: bold;
+      letter-spacing: 0.02em;
+      line-height: 1;
+    }
+    .score-of-100 {
+      font-size: 0.9em;
+      color: var(--muted);
+      margin-left: 4px;
+    }
+    .score-bar-wrap {
+      height: 5px;
+      background: var(--surface2);
+      border-radius: 3px;
+      margin: 10px 0 16px;
+      overflow: hidden;
+    }
+    .score-bar-fill { height: 100%; border-radius: 3px; }
+    .fill-ready { background: var(--green); }
+    .fill-watch { background: var(--yellow); }
+    .fill-wait  { background: var(--red); }
+
+    /* Score breakdown rows */
+    .breakdown-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 56px;
+      align-items: center;
+      padding: 7px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.81em;
+    }
+    .breakdown-row:last-child { border-bottom: none; }
+    .br-label  { color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.9em; }
+    .br-status { text-align: center; font-weight: bold; letter-spacing: 0.04em; }
+    .br-pts    { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+    /* ════════════════════════════════════════════
+       BADGES
+    ════════════════════════════════════════════ */
+    .badge {
+      display: inline-block;
+      padding: 6px 20px;
+      border-radius: 5px;
+      font-size: 0.9em;
+      font-weight: bold;
+      letter-spacing: 0.06em;
+    }
+    .badge-ready       { background: rgba(63,185,80,.14);  color: var(--green);   border: 1px solid rgba(63,185,80,.5); }
+    .badge-watch       { background: rgba(210,153,34,.14); color: var(--yellow);  border: 1px solid rgba(210,153,34,.5); }
+    .badge-wait        { background: rgba(248,81,73,.14);  color: var(--red);     border: 1px solid rgba(248,81,73,.5); }
+    .badge-ok          { background: rgba(63,185,80,.12);  color: var(--green);   border: 1px solid rgba(63,185,80,.4); }
+    .badge-warning     { background: rgba(210,153,34,.14); color: var(--yellow);  border: 1px solid rgba(210,153,34,.5); }
+    .badge-skip        { background: rgba(139,148,158,.1); color: var(--muted);   border: 1px solid var(--border); }
+    .badge-caution     { background: rgba(224,123,48,.14); color: var(--orange);  border: 1px solid rgba(224,123,48,.5); }
+    .badge-notrade     { background: rgba(248,81,73,.18);  color: var(--red);     border: 1px solid rgba(248,81,73,.6); }
+    .badge-wt-pullback { background: rgba(210,153,34,.14); color: var(--yellow);  border: 1px solid rgba(210,153,34,.5); }
+
+    /* Flag card */
+    .flag-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 10px;
+    }
+    .flag-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.78em;
+    }
+    .flag-row:last-child { border-bottom: none; }
+    .flag-name  { color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.88em; }
+    .flag-value { font-weight: bold; letter-spacing: 0.03em; }
+    .fv-up      { color: var(--green); }
+    .fv-down    { color: var(--red); }
+    .fv-ok      { color: var(--green); }
+    .fv-ng      { color: var(--red); }
+    .fv-warn    { color: var(--yellow); }
+    .fv-dim     { color: var(--dim); }
+
+    .direction-tag {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 3px;
+      font-size: 0.7em;
+      font-weight: bold;
+      letter-spacing: 0.06em;
+    }
+    .dir-long  { background: rgba(63,185,80,.12);  color: var(--green);  border: 1px solid rgba(63,185,80,.3); }
+    .dir-short { background: rgba(248,81,73,.12);   color: var(--red);    border: 1px solid rgba(248,81,73,.3); }
+    .dir-none  { background: transparent; color: var(--dim); border: 1px solid var(--border); }
+
+    /* ════════════════════════════════════════════
+       COLOR HELPERS
+    ════════════════════════════════════════════ */
+    .c-green  { color: var(--green); }
+    .c-red    { color: var(--red); }
+    .c-yellow { color: var(--yellow); }
+    .c-muted  { color: var(--muted); }
+    .c-dim    { color: var(--dim); }
+
+    /* ════════════════════════════════════════════
+       INTERPRETATION NOTE
+    ════════════════════════════════════════════ */
+    .note {
+      font-size: 0.75em;
+      color: var(--muted);
+      padding: 9px 13px;
+      border-left: 2px solid var(--border);
+      border-radius: 0 4px 4px 0;
+      background: var(--surface2);
+      margin-bottom: 12px;
+      line-height: 1.55;
+    }
+    .note-ready { border-left-color: var(--green); }
+    .note-watch { border-left-color: var(--yellow); }
+    .note-wait  { border-left-color: var(--red); }
+
+    /* ════════════════════════════════════════════
+       NO-DATA PLACEHOLDER
+    ════════════════════════════════════════════ */
+    .no-data-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 32px 16px;
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    .no-data-card .nd-text { font-size: 0.8em; color: var(--muted); margin-bottom: 6px; }
+    .no-data-card a { color: var(--blue); cursor: pointer; text-decoration: underline; font-size: 0.78em; }
+
+    /* ════════════════════════════════════════════
+       FORMS
+    ════════════════════════════════════════════ */
+    .form-group { margin-bottom: 12px; }
+    .form-group label {
+      display: block;
+      font-size: 0.64em;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 5px;
+    }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    input[type=file],
+    input[type=number],
+    input[type=text],
+    select {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 5px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85em;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--blue); }
+
+    textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 5px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.78em;
+      resize: vertical;
+      min-height: 88px;
+      line-height: 1.45;
+    }
+    textarea:focus { outline: none; border-color: var(--blue); }
+
+    .btn {
+      width: 100%;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 13px 20px;
+      border-radius: 6px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+      font-weight: bold;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      margin-top: 6px;
+    }
+    .btn:hover { background: #388bfd; }
+    .btn-secondary {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { background: var(--surface2); }
+
+    /* ════════════════════════════════════════════
+       ALERTS
+    ════════════════════════════════════════════ */
+    .alert-error {
+      background: rgba(248,81,73,.08);
+      border: 1px solid rgba(248,81,73,.4);
+      color: var(--red);
+      padding: 9px 13px;
+      border-radius: 5px;
+      font-size: 0.78em;
+      margin-bottom: 12px;
+    }
+    .alert-success {
+      background: rgba(63,185,80,.08);
+      border: 1px solid rgba(63,185,80,.4);
+      color: var(--green);
+      padding: 9px 13px;
+      border-radius: 5px;
+      font-size: 0.78em;
+      margin-bottom: 12px;
+    }
+
+    /* ════════════════════════════════════════════
+       COMBINED CONTROLLER
+    ════════════════════════════════════════════ */
+    .ctrl-row {
+      display: grid;
+      grid-template-columns: 90px 1fr 120px;
+      align-items: center;
+      padding: 7px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.81em;
+    }
+    .ctrl-label  { color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.9em; }
+    .ctrl-score  { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 0.95em; }
+    .ctrl-status { text-align: right; font-weight: bold; letter-spacing: 0.04em; }
+
+    .ctrl-combined-row {
+      display: grid;
+      grid-template-columns: 90px 1fr 120px;
+      align-items: center;
+      padding: 10px 0 8px;
+      font-size: 0.88em;
+    }
+    .ctrl-combined-label { color: var(--text); text-transform: uppercase; letter-spacing: 0.05em; font-weight: bold; font-size: 0.9em; }
+    .ctrl-combined-val   { text-align: right; font-size: 1.15em; font-weight: bold; letter-spacing: 0.07em; }
+
+    .ctrl-action {
+      font-size: 0.74em;
+      color: var(--muted);
+      padding: 8px 11px;
+      background: var(--surface2);
+      border-radius: 4px;
+      border-left: 2px solid var(--border);
+      line-height: 1.55;
+    }
+    .ctrl-action-ready        { border-left-color: var(--green); }
+    .ctrl-action-watch        { border-left-color: var(--yellow); }
+    .ctrl-action-notrade      { border-left-color: var(--red); }
+
+    /* ════════════════════════════════════════════
+       COPILOT FRESHNESS
+    ════════════════════════════════════════════ */
+    .fresh-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      font-size: 0.74em;
+    }
+    .fresh-badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 3px;
+      font-weight: bold;
+      font-size: 0.88em;
+      letter-spacing: 0.07em;
+    }
+    .fresh-live    { color: var(--green);  background: rgba(63,185,80,.12);  border: 1px solid rgba(63,185,80,.35); }
+    .fresh-delayed { color: var(--yellow); background: rgba(210,153,34,.12); border: 1px solid rgba(210,153,34,.35); }
+    .fresh-stale   { color: var(--red);    background: rgba(248,81,73,.12);  border: 1px solid rgba(248,81,73,.35); }
+    .fresh-time    { color: var(--muted); letter-spacing: 0.02em; }
+
+    /* ════════════════════════════════════════════
+       DATA TABLE
+    ════════════════════════════════════════════ */
+    .tbl-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.75em; }
+    th, td { padding: 5px 8px; text-align: right; border: 1px solid var(--border); }
+    th { background: var(--surface2); color: var(--muted); font-weight: normal; }
+    tr:last-child td { background: rgba(88,166,255,.05); font-weight: bold; }
+    td:first-child, th:first-child { text-align: left; }
+
+    /* ════════════════════════════════════════════
+       RISK / CAPITAL
+    ════════════════════════════════════════════ */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+    .risk-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.82em;
+    }
+    .risk-row:last-child { border-bottom: none; }
+    .risk-row-label { color: var(--muted); }
+
+    /* ════════════════════════════════════════════
+       STRATEGY SETTINGS
+    ════════════════════════════════════════════ */
+    .param-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 0;
+      border-bottom: 1px solid var(--border);
+      gap: 12px;
+    }
+    .param-row:last-of-type { border-bottom: none; }
+    .param-info { flex: 1; min-width: 0; }
+    .param-name { font-size: 0.82em; color: var(--text); }
+    .param-desc { font-size: 0.64em; color: var(--muted); margin-top: 2px; }
+    .param-input {
+      width: 80px;
+      flex-shrink: 0;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 8px;
+      border-radius: 5px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85em;
+      text-align: right;
+    }
+    .param-input:focus { outline: none; border-color: var(--blue); }
+    .param-section-label {
+      font-size: 0.62em;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 10px 0 4px;
+      margin-top: 6px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* Score weight info */
+    .weight-row {
+      display: grid;
+      grid-template-columns: 80px 1fr 36px;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 0;
+      font-size: 0.78em;
+    }
+    .weight-label { color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .weight-bar-wrap { background: var(--surface2); border-radius: 2px; height: 4px; overflow: hidden; }
+    .weight-bar-fill { height: 100%; border-radius: 2px; background: var(--blue); }
+    .weight-pts { text-align: right; color: var(--muted); }
+
+    .threshold-row {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      padding-top: 12px;
+      margin-top: 4px;
+      border-top: 1px solid var(--border);
+      font-size: 0.7em;
+    }
+    .thr-item { text-align: center; }
+    .thr-val  { font-weight: bold; display: block; margin-bottom: 2px; }
+
+    /* ════════════════════════════════════════════
+       TRADE LOG ACCORDION
+    ════════════════════════════════════════════ */
+    .log-accordion {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .log-accordion-hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .log-accordion-hdr:hover { background: rgba(255,255,255,.02); }
+    .log-accordion-label {
+      font-size: 0.72em;
+      font-weight: bold;
+      color: var(--text);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .log-accordion-arrow {
+      font-size: 0.75em;
+      color: var(--dim);
+      transition: transform .2s;
+    }
+    .log-accordion-arrow.open { transform: rotate(180deg); }
+    .log-accordion-body { padding: 0 14px 14px; display: none; }
+
+    /* Auto-filled snapshot chips */
+    .log-snapshot {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      padding-bottom: 12px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .log-chip {
+      font-size: 0.68em;
+      color: var(--muted);
+      background: var(--surface2);
+      padding: 3px 9px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+    }
+
+    /* Live RR display */
+    .rr-display {
+      font-size: 0.76em;
+      color: var(--blue);
+      padding: 6px 0 2px;
+      letter-spacing: 0.03em;
+      min-height: 1.4em;
+    }
+
+    /* ════════════════════════════════════════════
+       TRADE HISTORY TABLE
+    ════════════════════════════════════════════ */
+    .hist-wrap { overflow-x: auto; }
+    .hist-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.72em;
+      white-space: nowrap;
+    }
+    .hist-table th, .hist-table td {
+      padding: 5px 8px;
+      text-align: left;
+      border: 1px solid var(--border);
+    }
+    .hist-table th { background: var(--surface2); color: var(--muted); font-weight: normal; }
+    .hist-table tbody tr:first-child td { background: rgba(88,166,255,.04); }
+
+    .res-win     { color: var(--green);  font-weight: bold; }
+    .res-loss    { color: var(--red);    font-weight: bold; }
+    .res-be      { color: var(--yellow); font-weight: bold; }
+    .res-pending { color: var(--dim); }
+
+    .hist-empty {
+      text-align: center;
+      padding: 30px 0;
+      font-size: 0.8em;
+      color: var(--muted);
+    }
+
+    /* ════════════════════════════════════════════
+       CONTROLLER HERO CARD (Monitor top priority)
+    ════════════════════════════════════════════ */
+    .ctrl-hero-card {
+      border-radius: 12px;
+      padding: 28px 20px 20px;
+      margin-bottom: 14px;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      text-align: center;
+    }
+    .ctrl-hero-card-ready   { border-color: rgba(63,185,80,.55);  background: rgba(63,185,80,.04); }
+    .ctrl-hero-card-watch   { border-color: rgba(210,153,34,.55); background: rgba(210,153,34,.04); }
+    .ctrl-hero-card-caution { border-color: rgba(224,123,48,.55); background: rgba(224,123,48,.04); }
+    .ctrl-hero-card-notrade { border-color: rgba(248,81,73,.55);  background: rgba(248,81,73,.04); }
+    .ctrl-hero-card-empty   { border-color: var(--border); }
+
+    .ctrl-hero-eyebrow {
+      font-size: 0.6em;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      margin-bottom: 12px;
+    }
+    .ctrl-hero-status {
+      font-size: 3.2em;
+      font-weight: bold;
+      letter-spacing: 0.08em;
+      line-height: 1;
+      margin-bottom: 20px;
+    }
+    .ctrl-hero-inputs {
+      display: flex;
+      align-items: stretch;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 14px;
+      background: var(--surface2);
+    }
+    .ctrl-hero-input {
+      flex: 1;
+      padding: 13px 10px;
+      text-align: center;
+    }
+    .ctrl-hero-input + .ctrl-hero-input {
+      border-left: 1px solid var(--border);
+    }
+    .ctrl-hero-input-label {
+      display: block;
+      font-size: 0.58em;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 5px;
+    }
+    .ctrl-hero-input-score {
+      display: block;
+      font-size: 1em;
+      color: var(--text);
+      font-weight: bold;
+      margin-bottom: 5px;
+      font-variant-numeric: tabular-nums;
+    }
+    .ctrl-hero-input-status {
+      display: block;
+      font-size: 0.82em;
+      font-weight: bold;
+      letter-spacing: 0.06em;
+    }
+    .ctrl-hero-reason {
+      font-size: 0.8em;
+      color: var(--muted);
+      line-height: 1.6;
+      padding: 10px 14px;
+      background: var(--surface2);
+      border-radius: 6px;
+      border-left: 3px solid var(--border);
+      text-align: left;
+    }
+    .ctrl-reason-ready   { border-left-color: var(--green); }
+    .ctrl-reason-watch   { border-left-color: var(--yellow); }
+    .ctrl-reason-caution { border-left-color: var(--orange); }
+    .ctrl-reason-notrade { border-left-color: var(--red); }
+
+    /* Orange color helper */
+    .c-orange { color: var(--orange); }
+
+    /* ════════════════════════════════════════════
+       MOBILE — single column, large touch targets
+    ════════════════════════════════════════════ */
+    @media (max-width: 640px) {
+      /* Prevent iOS auto-zoom on input focus (needs font-size >= 16px) */
+      input[type=file],
+      input[type=number],
+      input[type=text],
+      select,
+      textarea { font-size: 16px; }
+
+      /* Panel padding */
+      .tab-panel { padding: 12px 12px 40px; }
+
+      /* Single column everywhere on mobile */
+      .mkt-row  { grid-template-columns: 1fr; }
+      .form-row { grid-template-columns: 1fr; }
+      .flag-grid { grid-template-columns: 1fr; }
+
+      /* Bigger touch targets for buttons */
+      .btn { padding: 15px 20px; min-height: 48px; font-size: 1em; }
+      .btn-secondary { min-height: 48px; }
+
+      /* Tab bar — bigger tap area */
+      .tab-btn { padding: 13px 4px; font-size: 0.64em; min-width: 72px; }
+
+      /* Controller hero */
+      .ctrl-hero-card { padding: 22px 14px 18px; }
+      .ctrl-hero-status { font-size: 2.6em; }
+      .ctrl-hero-inputs { flex-direction: row; }
+      .ctrl-hero-reason { font-size: 0.78em; }
+
+      /* Hero card (old-style panels) */
+      .hero-card { padding: 22px 14px 18px; }
+      .hero-value { font-size: 2.8em; }
+
+      /* Cards */
+      .card { padding: 14px 12px; }
+
+      /* Score big number */
+      .score-big { font-size: 2.2em; }
+
+      /* Breakdown rows slightly smaller */
+      .breakdown-row { font-size: 0.78em; }
+
+      /* Upload header — bigger tap area */
+      .upload-header { padding: 14px; }
+      .upload-header-label { font-size: 0.78em; }
+
+      /* Log accordion */
+      .log-accordion-hdr { padding: 14px; }
+
+      /* Param input wider for easier tapping */
+      .param-input { width: 90px; min-height: 44px; }
+
+      /* History table — horizontal scroll inside wrapper only */
+      .hist-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .hist-table { font-size: 0.68em; white-space: nowrap; }
+
+      /* Risk rows */
+      .risk-row { font-size: 0.85em; }
+
+      /* Stat grid keep 2-col but smaller labels */
+      .stat-grid { grid-template-columns: 1fr 1fr; }
+      .stat-label { font-size: 0.6em; }
+      .stat-value { font-size: 0.92em; }
+
+      /* Header decision badge */
+      .h-decision { font-size: 0.7em; padding: 5px 10px; }
+
+      /* Footer smaller */
+      .footer { font-size: 0.58em; }
+    }
+
+    /* Very small screens (iPhone SE, 375px) */
+    @media (max-width: 390px) {
+      .ctrl-hero-status { font-size: 2.2em; }
+      .tab-btn { font-size: 0.58em; min-width: 60px; }
+      .card { padding: 12px 10px; }
+    }
+
+    /* ════════════════════════════════════════════
+       FOOTER
+    ════════════════════════════════════════════ */
+    .footer {
+      text-align: center;
+      padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+      font-size: 0.6em;
+      color: var(--dim);
+      border-top: 1px solid var(--border);
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════
+     HEADER
+════════════════════════════════════════════ -->
+<div class="header">
+  <div>
+    <div class="header-title">AI Trading Desk</div>
+    <div class="header-sub">Phase 5 — トレードログ &amp; 履歴</div>
+  </div>
+  {% if combined_status == 'READY' %}
+    <span class="h-decision h-decision-ready">READY</span>
+  {% elif combined_status in ('WATCH', 'WAIT_PULLBACK') %}
+    <span class="h-decision h-decision-watch">{{ combined_status }}</span>
+  {% elif combined_status == 'CAUTION' %}
+    <span class="h-decision" style="color:var(--orange);background:rgba(224,123,48,.12);border:1px solid rgba(224,123,48,.35);">CAUTION</span>
+  {% elif combined_status in ('NO_TRADE', 'WAIT', 'SKIP') %}
+    <span class="h-decision h-decision-wait">{{ combined_status }}</span>
+  {% else %}
+    <span class="h-decision h-decision-nodata">—</span>
+  {% endif %}
+</div>
+
+<!-- ════════════════════════════════════════════
+     SESSION BAR
+════════════════════════════════════════════ -->
+<div class="session-bar">
+  <span class="sbar-time">{{ now_utc }} UTC</span>
+  <span class="sbar-session sess-{{ session_info.key }}">{{ session_info.label }}</span>
+</div>
+
+<!-- ════════════════════════════════════════════
+     TABS
+════════════════════════════════════════════ -->
+<div class="tabs">
+  <button class="tab-btn" data-tab="gold"     onclick="switchTab(this)">GOLD LONG</button>
+  <button class="tab-btn" data-tab="btc"      onclick="switchTab(this)">BTC LONG</button>
+  <button class="tab-btn" data-tab="monitor"  onclick="switchTab(this)">モニター</button>
+  <button class="tab-btn" data-tab="strategy" onclick="switchTab(this)">戦略設定</button>
+  <button class="tab-btn" data-tab="risk"     onclick="switchTab(this)">資金管理</button>
+  <button class="tab-btn" data-tab="history"  onclick="switchTab(this)">履歴</button>
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     PANEL — GOLD LONG
+════════════════════════════════════════════ -->
+<div class="tab-panel" id="panel-gold">
+{% if success and active_tab == 'gold' %}
+  <div class="alert-success">{{ success }}</div>
+{% endif %}
+{% if gold %}
+
+  <!-- Stat card -->
+  <div class="card">
+    <div class="card-title">XAUUSD — ゴールド</div>
+
+    <div class="desk-status-top">
+      <span class="desk-status-label">デスク状況</span>
+      <span class="badge {% if gold_status == 'READY' %}badge-ready{% elif gold_status == 'WATCH' %}badge-watch{% elif gold_status == 'SKIP' %}badge-skip{% else %}badge-wait{% endif %}">
+        {{ gold_status }}
+      </span>
+    </div>
+
+    <div class="stat-grid">
+      <div>
+        <div class="stat-label">直近終値</div>
+        <div class="stat-value">{{ gold.last_close }}</div>
+      </div>
+      <div>
+        <div class="stat-label">SMA ({{ gold.period }})</div>
+        <div class="stat-value">{{ gold.last_sma }}</div>
+      </div>
+      <div>
+        <div class="stat-label">Trend</div>
+        <div class="stat-value {{ 'c-green' if gold.trend == 'Uptrend' else 'c-red' }}">
+          {{ gold.trend }}
+        </div>
+      </div>
+      <div>
+        <div class="stat-label">方向</div>
+        <div class="stat-value">
+          <span class="direction-tag {% if gold_bd.direction == 'LONG' %}dir-long{% elif gold_bd.direction == 'SHORT' %}dir-short{% else %}dir-none{% endif %}">
+            {{ gold_bd.direction }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cond-block">
+      <div class="cond-row">
+        <span class="cond-label">状況</span>
+        <span class="cond-value {% if gold_status == 'READY' %}c-green{% elif gold_status == 'WATCH' %}c-yellow{% elif gold_status == 'SKIP' %}c-muted{% else %}c-red{% endif %}">
+          {% if gold_status == 'READY' %}Long セットアップ確認
+          {% elif gold_status == 'WATCH' %}部分的セットアップ — 監視中
+          {% elif gold_status == 'SKIP' %}Hard NG: {{ gold_bd.ng_reason }}
+          {% else %}セットアップなし{% endif %}
+        </span>
+      </div>
+      <div class="cond-detail">
+        {% if gold_bd.swing_low %}Swing Low: {{ "%.4g"|format(gold_bd.swing_low) }}
+        {% if gold_bd.swing_high %} / High: {{ "%.4g"|format(gold_bd.swing_high) }}{% endif %}
+        {% else %}終値 ({{ gold.last_close }}) vs SMA ({{ gold.last_sma }}){% endif %}
+      </div>
+    </div>
+
+    <div class="update-row">
+      <span class="update-label">最終更新</span>
+      <span class="update-value">{{ gold.loaded_at }}</span>
+    </div>
+  </div>
+
+  <!-- Score breakdown card -->
+  <div class="card">
+    <div class="card-title">エントリースコア</div>
+
+    <div class="score-top">
+      <div>
+        <span class="score-big {% if gold_status == 'READY' %}c-green{% elif gold_status == 'WATCH' %}c-yellow{% elif gold_status == 'SKIP' %}c-muted{% else %}c-red{% endif %}">
+          {{ gold_score }}
+        </span>
+        <span class="score-of-100">/ {{ score_max }}</span>
+      </div>
+      <span class="badge {% if gold_status == 'READY' %}badge-ready{% elif gold_status == 'WATCH' %}badge-watch{% elif gold_status == 'SKIP' %}badge-skip{% else %}badge-wait{% endif %}">
+        {{ gold_status }}
+      </span>
+    </div>
+
+    <div class="score-bar-wrap">
+      <div class="score-bar-fill {% if gold_status == 'READY' %}fill-ready{% elif gold_status == 'WATCH' %}fill-watch{% else %}fill-wait{% endif %}"
+           style="width: {{ gold_bar }}%"></div>
+    </div>
+
+    {% set bd = gold_bd %}
+    <div class="breakdown-row">
+      <span class="br-label">Trend</span>
+      <span class="br-status {% if bd.trend_lbl == 'UP' %}c-green{% elif bd.trend_lbl == 'RANGE' %}c-yellow{% else %}c-red{% endif %}">{{ bd.trend_lbl }}</span>
+      <span class="br-pts">{{ bd.trend_pts }} / {{ settings.trend_pts }}</span>
+    </div>
+    <div class="breakdown-row">
+      <span class="br-label">Location</span>
+      <span class="br-status {% if bd.loc_lbl == 'SUPPORT' %}c-green{% elif bd.loc_lbl == 'RESIST' %}c-yellow{% else %}c-red{% endif %}">{{ bd.loc_lbl }}</span>
+      <span class="br-pts">{{ bd.loc_pts }} / {{ settings.loc_pts }}</span>
+    </div>
+    <div class="breakdown-row">
+      <span class="br-label">Break</span>
+      <span class="br-status {% if bd.break_lbl == 'FAKE BRK' %}c-green{% elif bd.break_lbl == 'NO BRK' %}c-yellow{% else %}c-red{% endif %}">{{ bd.break_lbl }}</span>
+      <span class="br-pts">{{ bd.break_pts }} / {{ settings.break_pts }}</span>
+    </div>
+    <div class="breakdown-row">
+      <span class="br-label">Hold</span>
+      <span class="br-status {% if bd.hold_lbl == 'HELD' %}c-green{% elif bd.hold_lbl == 'UNKNOWN' %}c-yellow{% else %}c-red{% endif %}">{{ bd.hold_lbl }}</span>
+      <span class="br-pts">{{ bd.hold_pts }} / {{ settings.hold_pts }}</span>
+    </div>
+    <div class="breakdown-row">
+      <span class="br-label">Volume</span>
+      <span class="br-status {% if bd.vol_lbl == 'OK' %}c-green{% elif bd.vol_lbl == 'N/A' %}c-muted{% else %}c-red{% endif %}">{{ bd.vol_lbl }}</span>
+      <span class="br-pts">{{ bd.vol_pts }} / {{ settings.vol_pts }}</span>
+    </div>
+    <div class="breakdown-row" style="opacity:0.55;">
+      <span class="br-label">Session <span style="font-size:0.8em;">(参考)</span></span>
+      <span class="br-status {% if bd.sess_pts == 15 %}c-green{% elif bd.sess_pts == 5 %}c-yellow{% else %}c-dim{% endif %}">{{ bd.sess_lbl }}</span>
+      <span class="br-pts c-dim">{{ bd.sess_pts }} / 15</span>
+    </div>
+    <div class="breakdown-row" style="opacity:0.55;">
+      <span class="br-label">Timing <span style="font-size:0.8em;">(参考)</span></span>
+      <span class="br-status {% if bd.time_lbl == 'CONFIRMED' %}c-green{% elif bd.time_lbl == 'BREAK' %}c-yellow{% elif bd.time_lbl == 'NONE' %}c-red{% else %}c-muted{% endif %}">{{ bd.time_lbl }}</span>
+      <span class="br-pts c-dim">{{ bd.time_pts }} / 10</span>
+    </div>
+  </div>
+
+  <!-- Signal Flags card -->
+  <div class="card">
+    <div class="card-title">シグナルフラグ</div>
+    <div class="flag-grid">
+      <div class="flag-row">
+        <span class="flag-name">Trend</span>
+        <span class="flag-value {% if gold_bd.trend_flag == 'UP' %}fv-up{% elif gold_bd.trend_flag == 'DOWN' %}fv-down{% elif gold_bd.trend_flag == 'RANGE' %}fv-warn{% else %}fv-dim{% endif %}">{{ gold_bd.trend_flag }}</span>
+      </div>
+      <div class="flag-row">
+        <span class="flag-name">Location</span>
+        <span class="flag-value {% if gold_bd.loc_flag == 'SUPPORT' %}fv-ok{% elif gold_bd.loc_flag == 'RESISTANCE' %}fv-warn{% elif gold_bd.loc_flag == 'RANGE_MIDDLE' %}fv-ng{% else %}fv-dim{% endif %}">{{ gold_bd.loc_flag }}</span>
+      </div>
+      <div class="flag-row">
+        <span class="flag-name">Break</span>
+        <span class="flag-value {% if gold_bd.break_flag == 'FAKE_BREAK' %}fv-ok{% elif gold_bd.break_flag == 'NO_BREAK' %}fv-warn{% else %}fv-ng{% endif %}">{{ gold_bd.break_flag }}</span>
+      </div>
+      <div class="flag-row">
+        <span class="flag-name">Hold</span>
+        <span class="flag-value {% if gold_bd.hold_flag == 'HELD' %}fv-ok{% elif gold_bd.hold_flag == 'UNKNOWN' %}fv-warn{% else %}fv-ng{% endif %}">{{ gold_bd.hold_flag }}</span>
+      </div>
+      <div class="flag-row">
+        <span class="flag-name">Reaction</span>
+        <span class="flag-value {% if gold_bd.react_flag == 'HIGHER_HIGH' %}fv-ok{% elif gold_bd.react_flag == 'WICK_REJECTION' %}fv-ok{% else %}fv-dim{% endif %}">{{ gold_bd.react_flag }}</span>
+      </div>
+      <div class="flag-row">
+        <span class="flag-name">Volume</span>
+        <span class="flag-value {% if gold_bd.vol_flag == 'OK' %}fv-ok{% elif gold_bd.vol_flag == 'LOW' %}fv-ng{% else %}fv-dim{% endif %}">{{ gold_bd.vol_flag }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="note {% if gold_status == 'READY' %}note-ready{% elif gold_status == 'WATCH' %}note-watch{% else %}note-wait{% endif %}">
+    {% if gold_status == 'READY' %}
+      READY ({{ gold_score }}/{{ score_max }}) — {{ gold_bd.break_flag }} at {{ gold_bd.loc_flag }}、価格 {{ gold_bd.hold_flag }}。セットアップ確認済。
+    {% elif gold_status == 'WATCH' %}
+      WATCH ({{ gold_score }}/{{ score_max }}) — 部分的セットアップ。Break または Hold シグナルの強化を待ちます。
+    {% elif gold_status == 'SKIP' %}
+      SKIP — Hard NG: {{ gold_bd.ng_reason }}。エントリー禁止。
+    {% else %}
+      WAIT ({{ gold_score }}/{{ score_max }}) — スコアがしきい値 ({{ settings.ready_threshold }}) 未満。エントリーなし。セットアップを待ちます。
+    {% endif %}
+  </div>
+
+  <!-- Trade Log accordion -->
+  <div class="log-accordion">
+    <div class="log-accordion-hdr" onclick="toggleLog('gold')">
+      <span class="log-accordion-label">&#128221; トレードログ保存</span>
+      <span class="log-accordion-arrow" id="log-arrow-gold">▾</span>
+    </div>
+    <div class="log-accordion-body" id="log-body-gold">
+      <form action="/log/save" method="post">
+        <input type="hidden" name="market"      value="gold">
+        <input type="hidden" name="score"       value="{{ gold_score }}">
+        <input type="hidden" name="status"      value="{{ gold_status }}">
+        <input type="hidden" name="session"     value="{{ session_info.name }}">
+        <input type="hidden" name="timing"      value="{{ gold_bd.time_lbl }}">
+        <input type="hidden" name="direction"   value="{{ gold_bd.direction }}">
+        <input type="hidden" name="trend_pts"   value="{{ gold_bd.trend_pts }}">
+        <input type="hidden" name="trend_lbl"   value="{{ gold_bd.trend_lbl }}">
+        <input type="hidden" name="loc_pts"     value="{{ gold_bd.loc_pts }}">
+        <input type="hidden" name="loc_lbl"     value="{{ gold_bd.loc_lbl }}">
+        <input type="hidden" name="break_pts"   value="{{ gold_bd.break_pts }}">
+        <input type="hidden" name="break_lbl"   value="{{ gold_bd.break_lbl }}">
+        <input type="hidden" name="hold_pts"    value="{{ gold_bd.hold_pts }}">
+        <input type="hidden" name="hold_lbl"    value="{{ gold_bd.hold_lbl }}">
+        <input type="hidden" name="vol_pts"     value="{{ gold_bd.vol_pts }}">
+        <input type="hidden" name="vol_lbl"     value="{{ gold_bd.vol_lbl }}">
+        <input type="hidden" name="trend_flag"  value="{{ gold_bd.trend_flag }}">
+        <input type="hidden" name="loc_flag"    value="{{ gold_bd.loc_flag }}">
+        <input type="hidden" name="break_flag"  value="{{ gold_bd.break_flag }}">
+        <input type="hidden" name="hold_flag"   value="{{ gold_bd.hold_flag }}">
+        <input type="hidden" name="react_flag"  value="{{ gold_bd.react_flag }}">
+        <input type="hidden" name="vol_flag"    value="{{ gold_bd.vol_flag }}">
+
+        <!-- Auto-filled snapshot -->
+        <div class="log-snapshot">
+          <span class="log-chip">Score: {{ gold_score }}/{{ score_max }}</span>
+          <span class="log-chip">{{ gold_status }}</span>
+          <span class="log-chip">{{ gold_bd.direction }}</span>
+          <span class="log-chip">{{ session_info.name }}</span>
+          <span class="log-chip">{{ gold_bd.break_flag }}</span>
+          <span class="log-chip">{{ gold.loaded_at }}</span>
+        </div>
+
+        <!-- 時間足確認 -->
+        <div class="form-row">
+          <div class="form-group">
+            <label>日足</label>
+            <select name="tf_daily">
+              <option value="—" selected>—</option>
+              <option value="OK">OK</option>
+              <option value="NG">NG</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>H4</label>
+            <select name="tf_h4">
+              <option value="—" selected>—</option>
+              <option value="OK">OK</option>
+              <option value="NG">NG</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>H1</label>
+            <select name="tf_h1">
+              <option value="—" selected>—</option>
+              <option value="OK">OK</option>
+              <option value="NG">NG</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>M15</label>
+            <select name="tf_m15">
+              <option value="—" selected>—</option>
+              <option value="OK">OK</option>
+              <option value="NG">NG</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 価格入力 -->
+        <div class="form-row">
+          <div class="form-group">
+            <label>エントリー価格</label>
+            <input type="number" id="gold_entry" name="entry_price" step="any" min="0"
+                   placeholder="{{ gold.last_close }}" oninput="calcRR('gold')">
+          </div>
+          <div class="form-group">
+            <label>SL (損切り)</label>
+            <input type="number" id="gold_sl" name="stop_loss" step="any" min="0"
+                   placeholder="0.00" oninput="calcRR('gold')">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>TP (利確)</label>
+            <input type="number" id="gold_tp" name="take_profit" step="any" min="0"
+                   placeholder="0.00" oninput="calcRR('gold')">
+          </div>
+          <div class="form-group">
+            <label>&nbsp;</label>
+            <div class="rr-display" id="gold_rr">RR: —</div>
+          </div>
+        </div>
+
+        <!-- アクション + 結果 -->
+        <div class="form-row">
+          <div class="form-group">
+            <label>アクション</label>
+            <select name="action">
+              <option value="Entered">エントリー済</option>
+              <option value="Skipped">スキップ</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>結果</label>
+            <select name="result">
+              <option value="Pending" selected>保留中</option>
+              <option value="Win">勝ち</option>
+              <option value="Loss">負け</option>
+              <option value="BE">BE</option>
+            </select>
+          </div>
+        </div>
+
+        <button type="submit" class="btn" style="margin-top:8px;">ログ保存</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">価格履歴 — 直近 {{ gold.rows | length }} 本</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>日時</th><th>終値</th><th>SMA ({{ gold.period }})</th></tr>
+        </thead>
+        <tbody>
+          {% for r in gold.rows %}
+          <tr><td>{{ r.date }}</td><td>{{ r.close }}</td><td>{{ r.sma }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+{% else %}
+  <div class="no-data-card">
+    <div class="nd-text">Gold データが読み込まれていません。</div>
+    <a onclick="switchToTab('monitor')">モニタータブで CSV を読み込む</a>
+  </div>
+{% endif %}
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     PANEL — BTC LONG
+════════════════════════════════════════════ -->
+<div class="tab-panel" id="panel-btc">
+{% if success and active_tab == 'btc' %}
+  <div class="alert-success">{{ success }}</div>
+{% endif %}
+
+<!-- Live BTC Price card (always visible) -->
+<div class="card">
+  <div class="card-title">現在価格 — Binance BTCUSDT</div>
+  <div style="display:flex; align-items:center; justify-content:space-between;">
+    <div>
+      <div id="btc-live-price" style="font-size:2em; font-weight:bold; color:var(--yellow); letter-spacing:0.02em;">—</div>
+      <div style="font-size:0.64em; color:var(--dim); margin-top:3px;">
+        更新時刻: <span id="btc-live-time">—</span>
+      </div>
+    </div>
+    <button class="btn btn-secondary" onclick="fetchBtcPrice()"
+            style="width:auto; padding:8px 16px; font-size:0.78em;">
+      ↻ 更新
+    </button>
+  </div>
+  <div style="margin-top:10px; font-size:0.6em; color:var(--dim); border-top:1px solid var(--border); padding-top:7px;">
+    BTCUSDT · 30秒ごとに自動更新
+  </div>
+</div>
+
+{% if btc %}
+
+  <div class="card">
+    <div class="card-title">BTCUSD — ビットコイン</div>
+
+    <div class="desk-status-top">
+      <span class="desk-status-label">デスク状況</span>
+      <span class="badge {% if btc_status == 'READY' %}badge-ready{% elif btc_status == 'WATCH' %}badge-watch{% elif btc_status == 'SKIP' %}badge-skip{% else %}badge-wait{% endif %}">
+        {{ btc_status }}
+      </span>
+    </div>
+
+    <div class="stat-grid">
+      <div>
+        <div class="stat-label">直近終値</div>
+        <div class="stat-value">{{ btc.last_close }}</div>
+      </div>
+      <div>
+        <div class="stat-label">SMA ({{ btc.period }})</div>
+        <div class="stat-value">{{ btc.last_sma }}</div>
+      </div>
+      <div>
+        <div class="stat-label">Trend</div>
+        <div class="stat-value {{ 'c-green' if btc.trend == 'Uptrend' else 'c-red' }}">
+          {{ btc.trend }}
+        </div>
+      </div>
+      <div>
+        <div class="stat-label">方向</div>
+        <div class="stat-value">
+          <span class="direction-tag {% if btc_bd.direction == 'LONG' %}dir-long{% elif btc_bd.direction == 'SHORT' %}dir-short{% else %}dir-none{% endif %}">
+            {{ btc_bd.direction }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cond-block">
+      <div class="cond-row">
+        <span class="cond-label">状況</span>
+        <span class="cond-value {% if btc_status == 'READY' %}c-green{% elif btc_status == 'WATCH' %}c-yellow{% elif btc_status == 'SKIP' %}c-muted{% else %}c-red{% endif %}">
+          {% if btc_status == 'READY' %}Long セットアップ確認
+          {% elif btc_status == 'WATCH' %}部分的セットアップ — 監視中
+          {% elif btc_status == 'SKIP' %}Hard NG: {{ btc_bd.ng_reason }}
+          {% else %}セットアップなし{% endif %}
+        </span>
+      </div>
+      <div class="cond-detail">
+        {% if btc_bd.swing_low %}Swing Low: {{ "%.4g"|format(btc_bd.swing_low) }}
+        {% if btc_bd.swing_high %} / High: {{ "%.4g"|format(btc_bd.swing_high) }}{% endif %}
+        {% else %}終値 ({{ btc.last_close }}) vs SMA ({{ btc.last_sma }}){% endif %}
+      </div>
+    </div>
+
+    <div class="update-row">
+      <span class="update-label">最終更新</span>
+      <span class="update-value">{{ btc.loaded_at }}</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">エントリースコア</div>
+
+    <div class="score-top">
+      <div>
+        <span class="score-big {% if btc_status == 'READY' %}c-green{% elif btc_status == 'WATCH' %}c-yellow{% elif btc_status == 'SKIP' %}c-muted{% else %}c-red{% endif %}">
+          {{ btc_score }}
+        </span>
+        <span class="score-of-100">/ {{ score_max }}</span>
+      </div>
+      <span class="badge {% if btc_status == 'READY' %}badge-ready{% elif btc_status == 'WATCH' %}badge-watch{% elif btc_status == 'SKIP' %}badge-skip{% else %}badge-wait{% endif %}">
+        {{ btc_status }}
+      </span>
+    </div>
+
+    <div class="score-bar-wrap">
+      <div class="score-bar-fill {% if btc_status == 'READY' %}fill-ready{% elif btc_status == 'WATCH' %}fill-watch{% else %}fill-wait{% endif %}"
+           style="width: {{ btc_bar }}%"></div>
+    </div>
+
+    {% set bd = btc_bd %}
+    <div class="breakdown-row">
+      <span class="br-label">Trend</span>
+      <span class="br-status {% if bd.trend_lbl == 'UP' %}c-green{% elif bd.trend_lbl == 'RANGE' %}c-yellow{% else %}c-red{% endif %}">{{ bd.trend_lbl }}</span>
+      <span class="br-pts">{{ bd.trend_pts }} / {{ settings.trend_pts }}</span>
+    </div>
+    <div class="breakdown-row">
+      <span class="br-label">Location</span>
+      <span class="br-status {% if bd.loc_lbl == 'SUPPORT' %}c-green{% elif bd.loc_lbl == 'RESIST' %}c-yellow{% else %}c-red{% endif %}">{{ bd.loc_lbl }}</span>
+      <span class="br-pts">{{ bd.loc_pts }} / {{ settings.loc_pts }}</span>
+    </div>
+    <div class="breakdown-row">
+      <span class="br-label">Break</span>
+      <span class="br-status {% if bd.break_lbl == 'FAKE BRK' %}c-green{% elif bd.break_lbl == 'NO BRK' %}c-yellow{% else %}c-red{% endif %}">{{ bd.break_lbl }}</span>
+      <span class="br-pts">{{ bd.break_pts }} / {{ settings.break_pts }}</span>
+    </div>
+    <div class="breakdown-row">
+      <span class="br-label">Hold</span>
+      <span class="br-status {% if bd.hold_lbl == 'HELD' %}c-green{% elif bd.hold_lbl == 'UNKNOWN' %}c-yellow{% else %}c-red{% endif %}">{{ bd.hold_lbl }}</span>
+      <span class="br-pts">{{ bd.hold_pts }} / {{ settings.hold_pts }}</span>
+    </div>
+    <div class="breakdown-row">
+      <span class="br-label">Volume</span>
+      <span class="br-status {% if bd.vol_lbl == 'OK' %}c-green{% elif bd.vol_lbl == 'N/A' %}c-muted{% else %}c-red{% endif %}">{{ bd.vol_lbl }}</span>
+      <span class="br-pts">{{ bd.vol_pts }} / {{ settings.vol_pts }}</span>
+    </div>
+    <div class="breakdown-row" style="opacity:0.55;">
+      <span class="br-label">Session <span style="font-size:0.8em;">(参考)</span></span>
+      <span class="br-status {% if bd.sess_pts == 15 %}c-green{% elif bd.sess_pts == 5 %}c-yellow{% else %}c-dim{% endif %}">{{ bd.sess_lbl }}</span>
+      <span class="br-pts c-dim">{{ bd.sess_pts }} / 15</span>
+    </div>
+    <div class="breakdown-row" style="opacity:0.55;">
+      <span class="br-label">Timing <span style="font-size:0.8em;">(参考)</span></span>
+      <span class="br-status {% if bd.time_lbl == 'CONFIRMED' %}c-green{% elif bd.time_lbl == 'BREAK' %}c-yellow{% elif bd.time_lbl == 'NONE' %}c-red{% else %}c-muted{% endif %}">{{ bd.time_lbl }}</span>
+      <span class="br-pts c-dim">{{ bd.time_pts }} / 10</span>
+    </div>
+  </div>
+
+  <!-- Signal Flags card -->
+  <div class="card">
+    <div class="card-title">シグナルフラグ</div>
+    <div class="flag-grid">
+      <div class="flag-row">
+        <span class="flag-name">Trend</span>
+        <span class="flag-value {% if btc_bd.trend_flag == 'UP' %}fv-up{% elif btc_bd.trend_flag == 'DOWN' %}fv-down{% elif btc_bd.trend_flag == 'RANGE' %}fv-warn{% else %}fv-dim{% endif %}">{{ btc_bd.trend_flag }}</span>
+      </div>
+      <div class="flag-row">
+        <span class="flag-name">Location</span>
+        <span class="flag-value {% if btc_bd.loc_flag == 'SUPPORT' %}fv-ok{% elif btc_bd.loc_flag == 'RESISTANCE' %}fv-warn{% elif btc_bd.loc_flag == 'RANGE_MIDDLE' %}fv-ng{% else %}fv-dim{% endif %}">{{ btc_bd.loc_flag }}</span>
+      </div>
+      <div class="flag-row">
+        <span class="flag-name">Break</span>
+        <span class="flag-value {% if btc_bd.break_flag == 'FAKE_BREAK' %}fv-ok{% elif btc_bd.break_flag == 'NO_BREAK' %}fv-warn{% else %}fv-ng{% endif %}">{{ btc_bd.break_flag }}</span>
+      </div>
+      <div class="flag-row">
+        <span class="flag-name">Hold</span>
+        <span class="flag-value {% if btc_bd.hold_flag == 'HELD' %}fv-ok{% elif btc_bd.hold_flag == 'UNKNOWN' %}fv-warn{% else %}fv-ng{% endif %}">{{ btc_bd.hold_flag }}</span>
+      </div>
+      <div class="flag-row">
+        <span class="flag-name">Reaction</span>
+        <span class="flag-value {% if btc_bd.react_flag == 'HIGHER_HIGH' %}fv-ok{% elif btc_bd.react_flag == 'WICK_REJECTION' %}fv-ok{% else %}fv-dim{% endif %}">{{ btc_bd.react_flag }}</span>
+      </div>
+      <div class="flag-row">
+        <span class="flag-name">Volume</span>
+        <span class="flag-value {% if btc_bd.vol_flag == 'OK' %}fv-ok{% elif btc_bd.vol_flag == 'LOW' %}fv-ng{% else %}fv-dim{% endif %}">{{ btc_bd.vol_flag }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="note {% if btc_status == 'READY' %}note-ready{% elif btc_status == 'WATCH' %}note-watch{% else %}note-wait{% endif %}">
+    {% if btc_status == 'READY' %}
+      READY ({{ btc_score }}/{{ score_max }}) — {{ btc_bd.break_flag }} at {{ btc_bd.loc_flag }}、価格 {{ btc_bd.hold_flag }}。セットアップ確認済。
+    {% elif btc_status == 'WATCH' %}
+      WATCH ({{ btc_score }}/{{ score_max }}) — 部分的セットアップ。Break または Hold シグナルの強化を待ちます。
+    {% elif btc_status == 'SKIP' %}
+      SKIP — Hard NG: {{ btc_bd.ng_reason }}。エントリー禁止。
+    {% else %}
+      WAIT ({{ btc_score }}/{{ score_max }}) — スコアがしきい値 ({{ settings.ready_threshold }}) 未満。エントリーなし。セットアップを待ちます。
+    {% endif %}
+  </div>
+
+  <!-- Trade Log accordion -->
+  <div class="log-accordion">
+    <div class="log-accordion-hdr" onclick="toggleLog('btc')">
+      <span class="log-accordion-label">&#128221; トレードログ保存</span>
+      <span class="log-accordion-arrow" id="log-arrow-btc">▾</span>
+    </div>
+    <div class="log-accordion-body" id="log-body-btc">
+      <form action="/log/save" method="post">
+        <input type="hidden" name="market"      value="btc">
+        <input type="hidden" name="score"       value="{{ btc_score }}">
+        <input type="hidden" name="status"      value="{{ btc_status }}">
+        <input type="hidden" name="session"     value="{{ session_info.name }}">
+        <input type="hidden" name="timing"      value="{{ btc_bd.time_lbl }}">
+        <input type="hidden" name="direction"   value="{{ btc_bd.direction }}">
+        <input type="hidden" name="trend_pts"   value="{{ btc_bd.trend_pts }}">
+        <input type="hidden" name="trend_lbl"   value="{{ btc_bd.trend_lbl }}">
+        <input type="hidden" name="loc_pts"     value="{{ btc_bd.loc_pts }}">
+        <input type="hidden" name="loc_lbl"     value="{{ btc_bd.loc_lbl }}">
+        <input type="hidden" name="break_pts"   value="{{ btc_bd.break_pts }}">
+        <input type="hidden" name="break_lbl"   value="{{ btc_bd.break_lbl }}">
+        <input type="hidden" name="hold_pts"    value="{{ btc_bd.hold_pts }}">
+        <input type="hidden" name="hold_lbl"    value="{{ btc_bd.hold_lbl }}">
+        <input type="hidden" name="vol_pts"     value="{{ btc_bd.vol_pts }}">
+        <input type="hidden" name="vol_lbl"     value="{{ btc_bd.vol_lbl }}">
+        <input type="hidden" name="trend_flag"  value="{{ btc_bd.trend_flag }}">
+        <input type="hidden" name="loc_flag"    value="{{ btc_bd.loc_flag }}">
+        <input type="hidden" name="break_flag"  value="{{ btc_bd.break_flag }}">
+        <input type="hidden" name="hold_flag"   value="{{ btc_bd.hold_flag }}">
+        <input type="hidden" name="react_flag"  value="{{ btc_bd.react_flag }}">
+        <input type="hidden" name="vol_flag"    value="{{ btc_bd.vol_flag }}">
+
+        <div class="log-snapshot">
+          <span class="log-chip">Score: {{ btc_score }}/{{ score_max }}</span>
+          <span class="log-chip">{{ btc_status }}</span>
+          <span class="log-chip">{{ btc_bd.direction }}</span>
+          <span class="log-chip">{{ session_info.name }}</span>
+          <span class="log-chip">{{ btc_bd.break_flag }}</span>
+          <span class="log-chip">{{ btc.loaded_at }}</span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>日足</label>
+            <select name="tf_daily">
+              <option value="—" selected>—</option>
+              <option value="OK">OK</option>
+              <option value="NG">NG</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>H4</label>
+            <select name="tf_h4">
+              <option value="—" selected>—</option>
+              <option value="OK">OK</option>
+              <option value="NG">NG</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>H1</label>
+            <select name="tf_h1">
+              <option value="—" selected>—</option>
+              <option value="OK">OK</option>
+              <option value="NG">NG</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>M15</label>
+            <select name="tf_m15">
+              <option value="—" selected>—</option>
+              <option value="OK">OK</option>
+              <option value="NG">NG</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>エントリー価格</label>
+            <input type="number" id="btc_entry" name="entry_price" step="any" min="0"
+                   placeholder="{{ btc.last_close }}" oninput="calcRR('btc')">
+          </div>
+          <div class="form-group">
+            <label>SL (損切り)</label>
+            <input type="number" id="btc_sl" name="stop_loss" step="any" min="0"
+                   placeholder="0.00" oninput="calcRR('btc')">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>TP (利確)</label>
+            <input type="number" id="btc_tp" name="take_profit" step="any" min="0"
+                   placeholder="0.00" oninput="calcRR('btc')">
+          </div>
+          <div class="form-group">
+            <label>&nbsp;</label>
+            <div class="rr-display" id="btc_rr">RR: —</div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>アクション</label>
+            <select name="action">
+              <option value="Entered">エントリー済</option>
+              <option value="Skipped">スキップ</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>結果</label>
+            <select name="result">
+              <option value="Pending" selected>保留中</option>
+              <option value="Win">勝ち</option>
+              <option value="Loss">負け</option>
+              <option value="BE">BE</option>
+            </select>
+          </div>
+        </div>
+
+        <button type="submit" class="btn" style="margin-top:8px;">ログ保存</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">価格履歴 — 直近 {{ btc.rows | length }} 本</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>日時</th><th>終値</th><th>SMA ({{ btc.period }})</th></tr>
+        </thead>
+        <tbody>
+          {% for r in btc.rows %}
+          <tr><td>{{ r.date }}</td><td>{{ r.close }}</td><td>{{ r.sma }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+{% else %}
+  <div class="no-data-card">
+    <div class="nd-text">Bitcoin データが読み込まれていません。</div>
+    <a onclick="switchToTab('monitor')">モニタータブで CSV を読み込む</a>
+  </div>
+{% endif %}
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     PANEL — MONITOR
+════════════════════════════════════════════ -->
+<div class="tab-panel" id="panel-monitor">
+
+  {% if error and active_tab == 'monitor' %}
+  <div class="alert-error">{{ error }}</div>
+  {% endif %}
+  {% if success and active_tab == 'monitor' %}
+  <div class="alert-success">{{ success }}</div>
+  {% endif %}
+
+  <!-- 1. CONTROLLER HERO (TOP PRIORITY) -->
+  {% set cs = combined_status %}
+  {% if cs == 'READY' %}
+    {% set cs_css = 'ready' %}
+  {% elif cs in ('WATCH', 'WAIT_PULLBACK') %}
+    {% set cs_css = 'watch' %}
+  {% elif cs == 'CAUTION' %}
+    {% set cs_css = 'caution' %}
+  {% elif cs in ('NO_TRADE', 'WAIT', 'SKIP') %}
+    {% set cs_css = 'notrade' %}
+  {% else %}
+    {% set cs_css = 'empty' %}
+  {% endif %}
+
+  <div class="ctrl-hero-card ctrl-hero-card-{{ cs_css }}">
+    <div class="ctrl-hero-eyebrow">CONTROLLER</div>
+
+    {% if cs == 'READY' %}
+      <div class="ctrl-hero-status c-green">READY</div>
+    {% elif cs == 'WAIT_PULLBACK' %}
+      <div class="ctrl-hero-status c-yellow">WAIT_PULLBACK</div>
+    {% elif cs == 'CAUTION' %}
+      <div class="ctrl-hero-status c-orange">CAUTION</div>
+    {% elif cs == 'NO_TRADE' %}
+      <div class="ctrl-hero-status c-red">NO_TRADE</div>
+    {% elif cs == 'WATCH' %}
+      <div class="ctrl-hero-status c-yellow">WATCH</div>
+    {% elif cs == 'WAIT' %}
+      <div class="ctrl-hero-status c-red">WAIT</div>
+    {% elif cs == 'SKIP' %}
+      <div class="ctrl-hero-status c-muted">SKIP</div>
+    {% else %}
+      <div class="ctrl-hero-status c-dim">—</div>
+    {% endif %}
+
+    <div class="ctrl-hero-inputs">
+      <div class="ctrl-hero-input">
+        <span class="ctrl-hero-input-label">CSV スコア</span>
+        <span class="ctrl-hero-input-score">{{ csv_best_score if csv_best_score is not none else '—' }} / {{ score_max }}</span>
+        <span class="ctrl-hero-input-status
+          {% if decision == 'READY' %}c-green
+          {% elif decision == 'WATCH' %}c-yellow
+          {% elif decision in ('WAIT','SKIP') %}c-red
+          {% else %}c-dim{% endif %}">
+          {{ decision if decision != 'NO DATA' else '—' }}
+        </span>
+      </div>
+      <div class="ctrl-hero-input">
+        <span class="ctrl-hero-input-label">Copilot スコア</span>
+        <span class="ctrl-hero-input-score">{{ copilot_score if copilot_score is not none else '—' }} / 100</span>
+        <span class="ctrl-hero-input-status
+          {% if copilot_status == 'CONFIRM' %}c-green
+          {% elif copilot_status == 'MIXED' %}c-yellow
+          {% elif copilot_status == 'CAUTION' %}c-orange
+          {% else %}c-dim{% endif %}">
+          {{ copilot_status if copilot_status else '—' }}
+        </span>
+      </div>
+    </div>
+
+    <div class="ctrl-hero-reason ctrl-reason-{{ cs_css }}">
+      {{ combined_action }}
+    </div>
+  </div>
+
+  <!-- 2. CSV UPLOAD (always visible, one action) -->
+  <div class="upload-accordion">
+    <div class="upload-header" onclick="toggleUpload()">
+      <span class="upload-header-label">&#8593; CSV 読み込み</span>
+      <span class="upload-arrow" id="upload-arrow">▾</span>
+    </div>
+    <div class="upload-body" id="upload-body">
+      <form action="/upload" method="post" enctype="multipart/form-data">
+        <div class="form-group">
+          <label>マーケット</label>
+          <select name="market">
+            <option value="gold">GOLD — XAUUSD</option>
+            <option value="btc">BTC — BTCUSD</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>CSV ファイル (Date, Open, High, Low, Close)</label>
+          <input type="file" name="file" accept=".csv" required>
+        </div>
+        <div class="form-group">
+          <label>SMA 期間</label>
+          <input type="number" name="period" value="5" min="2" max="500">
+        </div>
+        <button type="submit" class="btn">分析 &amp; 読み込み</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 3. COPILOT IMPORT (paste + button) -->
+  <div class="upload-accordion">
+    <div class="upload-header" onclick="toggleCopilot()">
+      <span class="upload-header-label">
+        Copilot JSON
+        {% if copilot_freshness %}
+          <span class="fresh-badge {{ copilot_freshness.cls }}" style="margin-left:8px; font-size:0.8em; padding:2px 8px;">{{ copilot_freshness.label }}</span>
+        {% elif copilot_raw %}
+          <span style="font-size:0.72em; color:var(--muted); margin-left:8px;">読み込み済</span>
+        {% endif %}
+      </span>
+      <span class="upload-arrow" id="copilot-arrow">▾</span>
+    </div>
+    <div class="upload-body" id="copilot-body">
+      <form action="/copilot/import" method="post">
+        <div class="form-group">
+          <label>Copilot JSON を貼り付け</label>
+          <textarea name="copilot_json" rows="4"
+                    placeholder='{"trend_5m":"Buy","trend_15m":"Buy","trend_1h":"Neutral","bias":"Bullish","premium_discount":"Discount","momentum":"Bullish","volume":"High"}'></textarea>
+        </div>
+        <button type="submit" class="btn">Copilot 反映</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 4. MARKET STATUS COMPARISON (CSV Summary) -->
+  <div class="mkt-row">
+    <div class="mkt-cell {% if gold_status == 'READY' %}mkt-cell-ready{% elif gold_status == 'WATCH' %}mkt-cell-watch{% elif gold_status == 'WAIT' or gold_status == 'SKIP' %}mkt-cell-wait{% else %}mkt-cell-empty{% endif %}">
+      <div class="mkt-name">GOLD / XAUUSD</div>
+      {% if gold_status %}
+        <div class="mkt-status {% if gold_status == 'READY' %}c-green{% elif gold_status == 'WATCH' %}c-yellow{% elif gold_status == 'SKIP' %}c-muted{% else %}c-red{% endif %}">
+          {{ gold_status }}
+        </div>
+        <div class="mkt-score">{{ gold_score }} / {{ score_max }}</div>
+        <div class="mkt-trend">{{ gold_bd.trend_flag }} · {{ gold_bd.loc_flag }}</div>
+        <div class="mkt-bd">
+          <span class="mkt-bd-item">T:{{ gold_bd.trend_pts }}</span>
+          <span class="mkt-bd-item">L:{{ gold_bd.loc_pts }}</span>
+          <span class="mkt-bd-item">B:{{ gold_bd.break_pts }}</span>
+          <span class="mkt-bd-item">H:{{ gold_bd.hold_pts }}</span>
+          <span class="mkt-bd-item">V:{{ gold_bd.vol_pts }}</span>
+        </div>
+      {% else %}
+        <div class="mkt-empty-dash">—</div>
+        <div class="mkt-empty-label">no data</div>
+      {% endif %}
+    </div>
+    <div class="mkt-cell {% if btc_status == 'READY' %}mkt-cell-ready{% elif btc_status == 'WATCH' %}mkt-cell-watch{% elif btc_status == 'WAIT' or btc_status == 'SKIP' %}mkt-cell-wait{% else %}mkt-cell-empty{% endif %}">
+      <div class="mkt-name">BTC / BTCUSD</div>
+      {% if btc_status %}
+        <div class="mkt-status {% if btc_status == 'READY' %}c-green{% elif btc_status == 'WATCH' %}c-yellow{% elif btc_status == 'SKIP' %}c-muted{% else %}c-red{% endif %}">
+          {{ btc_status }}
+        </div>
+        <div class="mkt-score">{{ btc_score }} / {{ score_max }}</div>
+        <div class="mkt-trend">{{ btc_bd.trend_flag }} · {{ btc_bd.loc_flag }}</div>
+        <div class="mkt-bd">
+          <span class="mkt-bd-item">T:{{ btc_bd.trend_pts }}</span>
+          <span class="mkt-bd-item">L:{{ btc_bd.loc_pts }}</span>
+          <span class="mkt-bd-item">B:{{ btc_bd.break_pts }}</span>
+          <span class="mkt-bd-item">H:{{ btc_bd.hold_pts }}</span>
+          <span class="mkt-bd-item">V:{{ btc_bd.vol_pts }}</span>
+        </div>
+      {% else %}
+        <div class="mkt-empty-dash">—</div>
+        <div class="mkt-empty-label">no data</div>
+      {% endif %}
+      <div id="btc-live-price-monitor"
+           style="font-size:0.65em; color:var(--yellow); margin-top:6px; padding-top:5px;
+                  border-top:1px solid rgba(255,255,255,.05); letter-spacing:0.02em;">—</div>
+    </div>
+  </div>
+
+  <!-- 5. DETAILED BREAKDOWN (collapsible) -->
+  <div class="upload-accordion">
+    <div class="upload-header" onclick="toggleDetail()">
+      <span class="upload-header-label">詳細 / Breakdown</span>
+      <span class="upload-arrow" id="detail-arrow">▾</span>
+    </div>
+    <div class="upload-body" id="detail-body">
+
+      {% if copilot_raw %}
+      <div style="margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid var(--border);">
+        <div class="card-title" style="margin-bottom:12px;">Copilot 詳細</div>
+
+        {% if copilot_freshness %}
+        <div class="fresh-row">
+          <span class="fresh-badge {{ copilot_freshness.cls }}">{{ copilot_freshness.label }}</span>
+          <span class="fresh-time">Updated: {{ copilot_updated_at[11:16] }}</span>
+        </div>
+        {% endif %}
+
+        <div class="score-top" style="margin-bottom:10px;">
+          <div>
+            <span class="score-big {% if copilot_status == 'CONFIRM' %}c-green{% elif copilot_status == 'MIXED' %}c-yellow{% else %}c-red{% endif %}">
+              {{ copilot_score }}
+            </span>
+            <span class="score-of-100">/ 100</span>
+          </div>
+          <span class="badge {% if copilot_status == 'CONFIRM' %}badge-ready{% elif copilot_status == 'MIXED' %}badge-watch{% else %}badge-wait{% endif %}">
+            {{ copilot_status }}
+          </span>
+        </div>
+        <div class="score-bar-wrap">
+          <div class="score-bar-fill {% if copilot_status == 'CONFIRM' %}fill-ready{% elif copilot_status == 'MIXED' %}fill-watch{% else %}fill-wait{% endif %}"
+               style="width: {{ copilot_score }}%"></div>
+        </div>
+
+        <div class="breakdown-row">
+          <span class="br-label">5m Trend</span>
+          <span class="br-status {% if copilot_norm.trend_5m == 1 %}c-green{% elif copilot_norm.trend_5m == -1 %}c-red{% else %}c-muted{% endif %}">{{ copilot_raw.get('trend_5m', '—') }}</span>
+          <span class="br-pts">{{ 10 if copilot_norm.trend_5m == 1 else 0 }} / 10</span>
+        </div>
+        <div class="breakdown-row">
+          <span class="br-label">15m Trend</span>
+          <span class="br-status {% if copilot_norm.trend_15m == 1 %}c-green{% elif copilot_norm.trend_15m == -1 %}c-red{% else %}c-muted{% endif %}">{{ copilot_raw.get('trend_15m', '—') }}</span>
+          <span class="br-pts">{{ 10 if copilot_norm.trend_15m == 1 else 0 }} / 10</span>
+        </div>
+        <div class="breakdown-row">
+          <span class="br-label">1h Trend</span>
+          <span class="br-status {% if copilot_norm.trend_1h == 1 %}c-green{% elif copilot_norm.trend_1h == -1 %}c-red{% else %}c-muted{% endif %}">{{ copilot_raw.get('trend_1h', '—') }}</span>
+          <span class="br-pts">{{ 10 if copilot_norm.trend_1h == 1 else 0 }} / 10</span>
+        </div>
+        <div class="breakdown-row">
+          <span class="br-label">Bias</span>
+          <span class="br-status {% if copilot_norm.bias == 1 %}c-green{% elif copilot_norm.bias == -1 %}c-red{% else %}c-muted{% endif %}">{{ copilot_raw.get('bias', '—') }}</span>
+          <span class="br-pts">{{ 20 if copilot_norm.bias == 1 else (10 if copilot_norm.bias == 0 else 0) }} / 20</span>
+        </div>
+        {% if 'support' in copilot_raw %}
+        <div class="breakdown-row">
+          <span class="br-label">Support</span>
+          <span class="br-status c-green">{{ copilot_raw['support'] }}</span>
+          <span class="br-pts c-dim">ref</span>
+        </div>
+        {% endif %}
+        {% if 'resistance' in copilot_raw %}
+        <div class="breakdown-row">
+          <span class="br-label">Resistance</span>
+          <span class="br-status c-red">{{ copilot_raw['resistance'] }}</span>
+          <span class="br-pts c-dim">ref</span>
+        </div>
+        {% endif %}
+        <div class="breakdown-row">
+          <span class="br-label">Premium/Disc</span>
+          <span class="br-status {% if copilot_norm.premium_discount == 1 %}c-green{% elif copilot_norm.premium_discount == -1 %}c-red{% else %}c-muted{% endif %}">{{ copilot_raw.get('premium_discount', '—') }}</span>
+          <span class="br-pts">{{ 15 if copilot_norm.premium_discount == 1 else (7 if copilot_norm.premium_discount == 0 else 0) }} / 15</span>
+        </div>
+        <div class="breakdown-row">
+          <span class="br-label">Momentum</span>
+          <span class="br-status {% if copilot_norm.momentum == 1 %}c-green{% elif copilot_norm.momentum == -1 %}c-red{% else %}c-muted{% endif %}">{{ copilot_raw.get('momentum', '—') }}</span>
+          <span class="br-pts">{{ 20 if copilot_norm.momentum == 1 else (10 if copilot_norm.momentum == 0 else 0) }} / 20</span>
+        </div>
+        <div class="breakdown-row">
+          <span class="br-label">Volume</span>
+          <span class="br-status {% if copilot_norm.volume == 1 %}c-green{% elif copilot_norm.volume == -1 %}c-red{% else %}c-muted{% endif %}">{{ copilot_raw.get('volume', '—') }}</span>
+          <span class="br-pts">{{ 15 if copilot_norm.volume == 1 else (7 if copilot_norm.volume == 0 else 0) }} / 15</span>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="note" style="border-left-color: var(--blue); margin-bottom:0;">
+        Copilot is confirmation only. Final decision remains with the app logic and human trader.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     PANEL — STRATEGY SETTINGS
+════════════════════════════════════════════ -->
+<div class="tab-panel" id="panel-strategy">
+
+  {% if error %}
+  <div class="alert-error">{{ error }}</div>
+  {% endif %}
+  {% if success %}
+  <div class="alert-success">{{ success }}</div>
+  {% endif %}
+
+  <!-- Strategy form -->
+  <div class="card">
+    <div class="card-title">戦略設定 — {{ settings.strategy_name }}</div>
+    <form action="/strategy/save" method="post">
+
+      <!-- 名前 & しきい値 -->
+      <div class="param-row">
+        <div class="param-info">
+          <div class="param-name">戦略名</div>
+          <div class="param-desc">この設定のラベル</div>
+        </div>
+        <input class="param-input" type="text" name="strategy_name"
+               value="{{ settings.strategy_name }}"
+               style="width:140px; text-align:left;">
+      </div>
+
+      <div class="param-row">
+        <div class="param-info">
+          <div class="param-name">READY しきい値</div>
+          <div class="param-desc">READY を表示する最低スコア</div>
+        </div>
+        <input class="param-input" type="number" name="ready_threshold"
+               value="{{ settings.ready_threshold }}" min="1" max="{{ score_max }}" step="1">
+      </div>
+
+      <div class="param-row">
+        <div class="param-info">
+          <div class="param-name">WATCH しきい値</div>
+          <div class="param-desc">WATCH を表示する最低スコア (未満 = WAIT)</div>
+        </div>
+        <input class="param-input" type="number" name="watch_threshold"
+               value="{{ settings.watch_threshold }}" min="1" max="{{ score_max }}" step="1">
+      </div>
+
+      <!-- スコア配点 -->
+      <div class="param-section-label">スコア配点 (各コンポーネントの最大点)</div>
+
+      <div class="param-row">
+        <div class="param-info">
+          <div class="param-name">Trend ポイント</div>
+          <div class="param-desc">UP = 満点、RANGE = 半点、DOWN = 0</div>
+        </div>
+        <input class="param-input" type="number" name="trend_pts"
+               value="{{ settings.trend_pts }}" min="0" max="100" step="1">
+      </div>
+
+      <div class="param-row">
+        <div class="param-info">
+          <div class="param-name">Location ポイント</div>
+          <div class="param-desc">SUPPORT = 満点、RESISTANCE = 半点、MIDDLE = 0</div>
+        </div>
+        <input class="param-input" type="number" name="loc_pts"
+               value="{{ settings.loc_pts }}" min="0" max="100" step="1">
+      </div>
+
+      <div class="param-row">
+        <div class="param-info">
+          <div class="param-name">Break ポイント</div>
+          <div class="param-desc">FAKE_BREAK = 満点、NO_BREAK = 半点、VALID_BREAK = 0</div>
+        </div>
+        <input class="param-input" type="number" name="break_pts"
+               value="{{ settings.break_pts }}" min="0" max="100" step="1">
+      </div>
+
+      <div class="param-row">
+        <div class="param-info">
+          <div class="param-name">Hold ポイント</div>
+          <div class="param-desc">HELD = 満点、UNKNOWN = 半点、FAILED = 0</div>
+        </div>
+        <input class="param-input" type="number" name="hold_pts"
+               value="{{ settings.hold_pts }}" min="0" max="100" step="1">
+      </div>
+
+      <div class="param-row">
+        <div class="param-info">
+          <div class="param-name">Volume ポイント</div>
+          <div class="param-desc">OK = 満点、N/A = 半点、LOW = 0 (hard NG)</div>
+        </div>
+        <input class="param-input" type="number" name="vol_pts"
+               value="{{ settings.vol_pts }}" min="0" max="100" step="1">
+      </div>
+
+      <!-- 検出パラメータ -->
+      <div class="param-section-label">検出パラメータ</div>
+
+      <div class="param-row">
+        <div class="param-info">
+          <div class="param-name">ゾーンサイズ (レンジの %)</div>
+          <div class="param-desc">Swing レンジのこの % をサポート / レジスタンスゾーンとして判定</div>
+        </div>
+        <input class="param-input" type="number" name="ma_distance_limit"
+               value="{{ settings.ma_distance_limit }}" min="1" max="40" step="1">
+      </div>
+
+      <div class="param-row">
+        <div class="param-info">
+          <div class="param-name">Wick しきい値</div>
+          <div class="param-desc">WICK_REJECTION の下ヒゲ比率</div>
+        </div>
+        <input class="param-input" type="number" name="wick_threshold"
+               value="{{ settings.wick_threshold }}" min="0.05" max="1.0" step="0.05">
+      </div>
+
+      <div class="param-row">
+        <div class="param-info">
+          <div class="param-name">Volume 乗数</div>
+          <div class="param-desc">参考値 (OK = 平均の 0.8 倍以上)</div>
+        </div>
+        <input class="param-input" type="number" name="volume_multiplier"
+               value="{{ settings.volume_multiplier }}" min="0.5" max="5.0" step="0.1">
+      </div>
+
+      <div class="param-row">
+        <div class="param-info">
+          <div class="param-name">最小 RR</div>
+          <div class="param-desc">最小リスクリワード比 (参考)</div>
+        </div>
+        <input class="param-input" type="number" name="min_rr"
+               value="{{ settings.min_rr }}" min="0.5" max="10.0" step="0.5">
+      </div>
+
+      <div class="form-row" style="margin-top:14px; gap:8px;">
+        <button type="submit" formaction="/strategy/save"
+                class="btn btn-secondary" style="flex:1;">適用</button>
+        <button type="submit" formaction="/strategy/save_file"
+                class="btn" style="flex:2;">戦略を保存</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- 戦略読み込み -->
+  <div class="card">
+    <div class="card-title">戦略を読み込む</div>
+    {% if presets %}
+    <form action="/strategy/load_file" method="post">
+      <div class="form-group">
+        <label>保存済み戦略</label>
+        <select name="preset_name">
+          {% for p in presets %}
+          <option value="{{ p }}"
+            {% if p == settings.strategy_name %}selected{% endif %}>
+            {{ p }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn">読み込む</button>
+    </form>
+    {% else %}
+    <div style="font-size:0.78em; color:var(--muted); padding:8px 0;">
+      保存済み戦略はありません。設定を入力して <strong>戦略を保存</strong> をクリックしてください。
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- スコアサマリー -->
+  <div class="card">
+    <div class="card-title">スコアサマリー</div>
+
+    <div class="weight-row">
+      <span class="weight-label">Trend</span>
+      <div class="weight-bar-wrap">
+        <div class="weight-bar-fill" style="width:{{ (settings.trend_pts / score_max * 100) | round | int }}%"></div>
+      </div>
+      <span class="weight-pts">{{ settings.trend_pts }} pts</span>
+    </div>
+    <div class="weight-row">
+      <span class="weight-label">Location</span>
+      <div class="weight-bar-wrap">
+        <div class="weight-bar-fill" style="width:{{ (settings.loc_pts / score_max * 100) | round | int }}%"></div>
+      </div>
+      <span class="weight-pts">{{ settings.loc_pts }} pts</span>
+    </div>
+    <div class="weight-row">
+      <span class="weight-label">Break</span>
+      <div class="weight-bar-wrap">
+        <div class="weight-bar-fill" style="width:{{ (settings.break_pts / score_max * 100) | round | int }}%"></div>
+      </div>
+      <span class="weight-pts">{{ settings.break_pts }} pts</span>
+    </div>
+    <div class="weight-row">
+      <span class="weight-label">Hold</span>
+      <div class="weight-bar-wrap">
+        <div class="weight-bar-fill" style="width:{{ (settings.hold_pts / score_max * 100) | round | int }}%"></div>
+      </div>
+      <span class="weight-pts">{{ settings.hold_pts }} pts</span>
+    </div>
+    <div class="weight-row">
+      <span class="weight-label">Volume</span>
+      <div class="weight-bar-wrap">
+        <div class="weight-bar-fill" style="width:{{ (settings.vol_pts / score_max * 100) | round | int }}%"></div>
+      </div>
+      <span class="weight-pts">{{ settings.vol_pts }} pts</span>
+    </div>
+
+    <div class="weight-row" style="padding-top:8px; border-top:1px solid var(--border); margin-top:4px;">
+      <span class="weight-label" style="color:var(--text); font-weight:bold;">合計最大</span>
+      <div class="weight-bar-wrap">
+        <div class="weight-bar-fill" style="width:100%; background:var(--accent);"></div>
+      </div>
+      <span class="weight-pts" style="color:var(--text); font-weight:bold;">{{ score_max }} pts</span>
+    </div>
+
+    <div class="threshold-row">
+      <div class="thr-item">
+        <span class="thr-val c-green">≥ {{ settings.ready_threshold }}</span>
+        <span class="c-muted" style="font-size:.65em;">READY</span>
+      </div>
+      <div class="thr-item">
+        <span class="thr-val c-yellow">≥ {{ settings.watch_threshold }}</span>
+        <span class="c-muted" style="font-size:.65em;">WATCH</span>
+      </div>
+      <div class="thr-item">
+        <span class="thr-val c-red">&lt; {{ settings.watch_threshold }}</span>
+        <span class="c-muted" style="font-size:.65em;">WAIT</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     PANEL — RISK / CAPITAL
+════════════════════════════════════════════ -->
+<div class="tab-panel" id="panel-risk">
+
+  <div class="card">
+    <div class="card-title">リスク計算</div>
+    <form action="/risk" method="post">
+      <div class="form-group">
+        <label>口座残高 (JPY)</label>
+        <input type="number" name="balance" value="{{ balance | int }}" min="1" step="1000">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>最大リスク / トレード (JPY)</label>
+          <input type="number" name="max_risk" value="{{ max_risk | int }}" min="1" step="100">
+        </div>
+        <div class="form-group">
+          <label>ロットサイズ</label>
+          <input type="number" name="lot_size" value="{{ lot_size }}" min="0.001" step="0.001">
+        </div>
+      </div>
+      <button type="submit" class="btn">計算</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="card-title">リスク状況</div>
+
+    <div class="desk-status-top">
+      <span class="desk-status-label">状況</span>
+      <span class="badge {{ 'badge-ok' if risk_status == 'OK' else 'badge-warning' }}">
+        {{ risk_status }}
+      </span>
+    </div>
+
+    <div class="note {{ 'note-ready' if risk_status == 'OK' else 'note-wait' }}" style="margin-bottom:0;">
+      {{ risk_message }}
+    </div>
+
+    <hr class="divider">
+
+    <div class="risk-row">
+      <span class="risk-row-label">口座残高</span>
+      <span>{{ "{:,.0f}".format(balance) }} JPY</span>
+    </div>
+    <div class="risk-row">
+      <span class="risk-row-label">最大リスク</span>
+      <span>{{ "{:,.0f}".format(max_risk) }} JPY</span>
+    </div>
+    <div class="risk-row">
+      <span class="risk-row-label">ロットサイズ</span>
+      <span>{{ lot_size }}</span>
+    </div>
+    <div class="risk-row">
+      <span class="risk-row-label">リスク率</span>
+      <span class="{{ 'c-green' if risk_status == 'OK' else 'c-yellow' }}">{{ risk_pct }}%</span>
+    </div>
+    <div class="risk-row">
+      <span class="risk-row-label">ルール</span>
+      <span class="c-muted">最大 2% / トレード</span>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     PANEL — TRADE HISTORY
+════════════════════════════════════════════ -->
+<div class="tab-panel" id="panel-history">
+
+  <div class="card">
+    <div class="card-title">トレード履歴 — {{ logs | length }} 件</div>
+
+    {% if logs %}
+    <div class="hist-wrap">
+      <table class="hist-table">
+        <thead>
+          <tr>
+            <th>日時</th>
+            <th>Mkt</th>
+            <th>スコア</th>
+            <th>状況</th>
+            <th>セッション</th>
+            <th>Timing</th>
+            <th>T/L/B/H/V</th>
+            <th>日/H4/H1/M15</th>
+            <th>Entry</th>
+            <th>SL</th>
+            <th>TP</th>
+            <th>RR</th>
+            <th>アクション</th>
+            <th>結果</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+          <tr>
+            <td>{{ log.timestamp }}</td>
+            <td>{{ log.market }}</td>
+            <td class="{% if log.status == 'READY' %}c-green{% elif log.status == 'WATCH' %}c-yellow{% else %}c-red{% endif %}">
+              {{ log.score }}
+            </td>
+            <td>{{ log.status }}</td>
+            <td>{{ log.session }}</td>
+            <td>{{ log.timing }}</td>
+            <td class="c-muted">{{ log.get('trend_pts','—') }}/{{ log.get('loc_pts','—') }}/{{ log.get('break_pts', log.get('react_pts','—')) }}/{{ log.get('hold_pts','—') }}/{{ log.get('vol_pts','—') }}</td>
+            <td>{{ log.tf_daily }}/{{ log.tf_h4 }}/{{ log.tf_h1 }}/{{ log.tf_m15 }}</td>
+            <td>{{ log.entry_price if log.entry_price else '—' }}</td>
+            <td>{{ log.stop_loss   if log.stop_loss   else '—' }}</td>
+            <td>{{ log.take_profit if log.take_profit else '—' }}</td>
+            <td>{{ log.rr if log.rr else '—' }}</td>
+            <td>{{ log.action }}</td>
+            <td class="{% if log.result == 'Win' %}res-win{% elif log.result == 'Loss' %}res-loss{% elif log.result == 'BE' %}res-be{% else %}res-pending{% endif %}">
+              {{ log.result }}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="hist-empty">
+      トレードログはまだありません。<br>
+      GOLD または BTC タブからログを保存してください。
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     FOOTER
+════════════════════════════════════════════ -->
+<div class="footer">
+  AI Trading Desk &middot; Phase 5 &middot; 判断補助ツール &middot; 投資助言ではありません
+</div>
+
+
+<script>
+  var TABS = ['gold', 'btc', 'monitor', 'strategy', 'risk', 'history'];
+
+  function switchTab(btn) {
+    var name = btn.dataset.tab;
+    TABS.forEach(function(t) {
+      document.getElementById('panel-' + t).classList.remove('active');
+      document.querySelector('[data-tab="' + t + '"]').classList.remove('active');
+    });
+    document.getElementById('panel-' + name).classList.add('active');
+    btn.classList.add('active');
+    try { localStorage.setItem('activeTab', name); } catch(e) {}
+  }
+
+  function switchToTab(name) {
+    var btn = document.querySelector('[data-tab="' + name + '"]');
+    if (btn) switchTab(btn);
+  }
+
+  function toggleLog(market) {
+    var body  = document.getElementById('log-body-'  + market);
+    var arrow = document.getElementById('log-arrow-' + market);
+    var open  = body.style.display !== 'none';
+    body.style.display = open ? 'none' : 'block';
+    arrow.classList.toggle('open', !open);
+  }
+
+  function calcRR(market) {
+    var entry  = parseFloat(document.getElementById(market + '_entry').value);
+    var sl     = parseFloat(document.getElementById(market + '_sl').value);
+    var tp     = parseFloat(document.getElementById(market + '_tp').value);
+    var el     = document.getElementById(market + '_rr');
+    if (entry > 0 && sl > 0 && tp > 0) {
+      var risk   = entry - sl;
+      var reward = tp    - entry;
+      if (risk > 0 && reward > 0) {
+        el.textContent = 'RR: ' + (reward / risk).toFixed(2);
+        return;
+      }
+    }
+    el.textContent = 'RR: —';
+  }
+
+  function toggleUpload() {
+    var body  = document.getElementById('upload-body');
+    var arrow = document.getElementById('upload-arrow');
+    var open  = body.style.display !== 'none';
+    body.style.display = open ? 'none' : 'block';
+    arrow.classList.toggle('open', !open);
+  }
+
+  function toggleCopilot() {
+    var body  = document.getElementById('copilot-body');
+    var arrow = document.getElementById('copilot-arrow');
+    var open  = body.style.display !== 'none';
+    body.style.display = open ? 'none' : 'block';
+    arrow.classList.toggle('open', !open);
+  }
+
+  function toggleDetail() {
+    var body  = document.getElementById('detail-body');
+    var arrow = document.getElementById('detail-arrow');
+    var open  = body.style.display !== 'none';
+    body.style.display = open ? 'none' : 'block';
+    arrow.classList.toggle('open', !open);
+  }
+
+  // Auto-open upload when there is an error or no data at all
+  {% if error or (not gold and not btc) %}
+  (function() {
+    document.getElementById('upload-body').style.display = 'block';
+    document.getElementById('upload-arrow').classList.add('open');
+  })();
+  {% endif %}
+
+  // Activate the tab: server request > localStorage memory > monitor default
+  (function() {
+    var serverTab = '{{ active_tab }}';
+    var active = serverTab;
+    if (active === 'monitor') {
+      try {
+        var saved = localStorage.getItem('activeTab');
+        if (saved && TABS.indexOf(saved) !== -1) active = saved;
+      } catch(e) {}
+    }
+    var btn = document.querySelector('[data-tab="' + active + '"]');
+    if (!btn) btn = document.querySelector('[data-tab="monitor"]');
+    switchTab(btn);
+  })();
+
+  // ── Live BTC Price ────────────────────────────────────────────────────────
+  function fetchBtcPrice() {
+    fetch('/api/price')
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        var priceEl   = document.getElementById('btc-live-price');
+        var timeEl    = document.getElementById('btc-live-time');
+        var monitorEl = document.getElementById('btc-live-price-monitor');
+        if (d.price) {
+          var fmt = '$' + d.price.toLocaleString('en-US', {
+            minimumFractionDigits: 2, maximumFractionDigits: 2
+          });
+          if (priceEl)   priceEl.textContent   = fmt;
+          if (monitorEl) monitorEl.textContent  = fmt;
+          if (timeEl)    timeEl.textContent     = d.fetched_at;
+        } else {
+          if (priceEl)   priceEl.textContent   = 'API Error';
+          if (monitorEl) monitorEl.textContent  = '—';
+          if (timeEl)    timeEl.textContent     = d.fetched_at || '—';
+        }
+      })
+      .catch(function() {
+        var priceEl = document.getElementById('btc-live-price');
+        if (priceEl) priceEl.textContent = 'Network Error';
+      });
+  }
+
+  fetchBtcPrice();
+  setInterval(fetchBtcPrice, 30000);
+
+  // Mobile keyboard hints — decimal for price inputs, numeric for integers
+  document.querySelectorAll('input[type=number]').forEach(function(el) {
+    var step = el.getAttribute('step');
+    el.setAttribute('inputmode', (step && step !== '1') ? 'decimal' : 'numeric');
+  });
+</script>
+
+</body>
+</html>
